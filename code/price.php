@@ -33,22 +33,12 @@ $stmt = $db->prepare('SELECT * FROM pembayaran WHERE id_order = ?');
 $stmt->execute([$order_id]);
 $payment = $stmt->fetch();
 
-$methods = [
-    'saldo' => ['name' => 'Bayar Pakai Saldo', 'icon' => 'account_balance_wallet', 'color' => 'from-primary to-secondary', 'saldo' => true],
-    'gopay' => ['name' => 'GoPay', 'icon' => 'account_balance_wallet', 'color' => 'from-green-500 to-green-600', 'saldo' => false],
-    'dana' => ['name' => 'DANA', 'icon' => 'account_balance_wallet', 'color' => 'from-blue-500 to-blue-600', 'saldo' => false],
-    'bca' => ['name' => 'BCA Transfer', 'icon' => 'account_balance', 'color' => 'from-red-500 to-red-600', 'saldo' => false],
-    'bri' => ['name' => 'BRI Transfer', 'icon' => 'account_balance', 'color' => 'from-blue-700 to-blue-800', 'saldo' => false],
-    'mandiri' => ['name' => 'Mandiri Transfer', 'icon' => 'account_balance', 'color' => 'from-yellow-600 to-yellow-700', 'saldo' => false],
-    'bni' => ['name' => 'BNI Transfer', 'icon' => 'account_balance', 'color' => 'from-blue-600 to-blue-700', 'saldo' => false],
-    'tunai' => ['name' => 'Tunai (Bayar di Tempat)', 'icon' => 'payments', 'color' => 'from-gray-500 to-gray-600', 'saldo' => false]
-];
-
+// Handle payment
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['metode'])) {
     $metode = $_POST['metode'];
     
     if ($metode === 'saldo') {
-        // Cek saldo cukup
+        // Bayar pakai saldo
         if ($saldo >= $order['harga_snapshot']) {
             // Kurangi saldo
             $stmt = $db->prepare('UPDATE user SET saldo = saldo - ? WHERE id_user = ?');
@@ -65,27 +55,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['metode'])) {
             header('Location: order_details_process.php?order=' . $order_id);
             exit;
         } else {
-            set_flash('error', 'Saldo tidak cukup! Silakan top up terlebih dahulu. (Saldo Anda: Rp ' . number_format($saldo, 0, ',', '.') . ')');
+            set_flash('error', 'Saldo tidak cukup! Silakan top up terlebih dahulu.');
             header('Location: payment.php?order_id=' . $order_id);
             exit;
         }
     } else {
-        // Pembayaran via metode lain (perlu verifikasi supervisor)
+        // Pembayaran via metode lain - upload bukti
         $nomor_transaksi = 'TRX' . date('YmdHis') . rand(100, 999);
+        $bukti_pembayaran = null;
         
-        if ($payment) {
-            $stmt = $db->prepare('UPDATE pembayaran SET metode = ?, nomor_transaksi = ?, tanggal_pembayaran = NOW(), status_bayar = "pending" WHERE id_order = ?');
-            $stmt->execute([$metode, $nomor_transaksi, $order_id]);
-        } else {
-            $stmt = $db->prepare('INSERT INTO pembayaran (id_order, metode, nomor_transaksi, tanggal_pembayaran, jumlah_bayar, status_bayar) VALUES (?, ?, ?, NOW(), ?, "pending")');
-            $stmt->execute([$order_id, $metode, $nomor_transaksi, $order['harga_snapshot']]);
+        // Handle file upload
+        if (isset($_FILES['bukti_pembayaran']) && $_FILES['bukti_pembayaran']['error'] === UPLOAD_ERR_OK) {
+            $upload_dir = 'uploads/bukti_pembayaran/';
+            if (!file_exists($upload_dir)) {
+                mkdir($upload_dir, 0777, true);
+            }
+            $file_extension = pathinfo($_FILES['bukti_pembayaran']['name'], PATHINFO_EXTENSION);
+            $bukti_pembayaran = $upload_dir . 'bukti_' . $order_id . '_' . time() . '.' . $file_extension;
+            move_uploaded_file($_FILES['bukti_pembayaran']['tmp_name'], $bukti_pembayaran);
         }
         
-        set_flash('success', 'Pembayaran via ' . strtoupper($metode) . ' berhasil diproses! Menunggu verifikasi supervisor.');
+        $catatan = $_POST['catatan'] ?? '';
+        
+        if ($payment) {
+            $stmt = $db->prepare('UPDATE pembayaran SET metode = ?, nomor_transaksi = ?, tanggal_pembayaran = NOW(), status_bayar = "pending", bukti_pembayaran = ?, catatan_pembayaran = ? WHERE id_order = ?');
+            $stmt->execute([$metode, $nomor_transaksi, $bukti_pembayaran, $catatan, $order_id]);
+        } else {
+            $stmt = $db->prepare('INSERT INTO pembayaran (id_order, metode, nomor_transaksi, tanggal_pembayaran, jumlah_bayar, status_bayar, bukti_pembayaran, catatan_pembayaran) VALUES (?, ?, ?, NOW(), ?, "pending", ?, ?)');
+            $stmt->execute([$order_id, $metode, $nomor_transaksi, $order['harga_snapshot'], $bukti_pembayaran, $catatan]);
+        }
+        
+        set_flash('success', 'Pembayaran via ' . strtoupper($metode) . ' berhasil! Menunggu verifikasi supervisor.');
         header('Location: order_details_process.php?order=' . $order_id);
         exit;
     }
 }
+
+$methods = [
+    'saldo' => ['name' => 'Bayar Pakai Saldo', 'icon' => 'account_balance_wallet', 'color' => 'from-primary to-secondary', 'need_upload' => false],
+    'gopay' => ['name' => 'GoPay', 'icon' => 'account_balance_wallet', 'color' => 'from-green-500 to-green-600', 'need_upload' => true],
+    'dana' => ['name' => 'DANA', 'icon' => 'account_balance_wallet', 'color' => 'from-blue-500 to-blue-600', 'need_upload' => true],
+    'bca' => ['name' => 'BCA Transfer', 'icon' => 'account_balance', 'color' => 'from-red-500 to-red-600', 'need_upload' => true],
+    'bri' => ['name' => 'BRI Transfer', 'icon' => 'account_balance', 'color' => 'from-blue-700 to-blue-800', 'need_upload' => true],
+    'mandiri' => ['name' => 'Mandiri Transfer', 'icon' => 'account_balance', 'color' => 'from-yellow-600 to-yellow-700', 'need_upload' => true],
+    'bni' => ['name' => 'BNI Transfer', 'icon' => 'account_balance', 'color' => 'from-blue-600 to-blue-700', 'need_upload' => true],
+    'tunai' => ['name' => 'Tunai (Bayar di Tempat)', 'icon' => 'payments', 'color' => 'from-gray-500 to-gray-600', 'need_upload' => false]
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -105,6 +120,18 @@ tailwind.config = {
             colors: { "primary": "#6366f1", "secondary": "#8b5cf6" },
             fontFamily: { "display": ["Inter", "sans-serif"] }
         }
+    }
+}
+</script>
+<script>
+function showUploadForm(method, needUpload) {
+    if (needUpload) {
+        document.getElementById('uploadForm').style.display = 'block';
+        document.getElementById('selectedMethod').value = method;
+        document.getElementById('selectedMethodName').innerText = method.toUpperCase();
+    } else {
+        document.getElementById('selectedMethod').value = method;
+        document.getElementById('paymentForm').submit();
     }
 }
 </script>
@@ -165,19 +192,25 @@ tailwind.config = {
                 <p class="text-sm text-blue-600 dark:text-blue-400">Saldo Anda</p>
                 <p class="text-xl font-bold text-blue-700 dark:text-blue-300">Rp <?= number_format($saldo, 0, ',', '.') ?></p>
             </div>
-            <a href="topup.php" class="text-sm bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600 transition">Top Up</a>
+            <a href="topup.php" class="text-sm bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600 transition">Top Up Saldo</a>
         </div>
-        <?php if ($saldo < $order['harga_snapshot']): ?>
-        <p class="text-xs text-red-500 mt-2">⚠️ Saldo tidak cukup untuk membayar order ini. Silakan top up atau pilih metode lain.</p>
+        <?php if ($saldo >= $order['harga_snapshot']): ?>
+        <p class="text-xs text-green-600 mt-2">✅ Saldo cukup! Anda bisa bayar pakai saldo.</p>
+        <?php else: ?>
+        <p class="text-xs text-red-500 mt-2">⚠️ Saldo tidak cukup. Silakan top up atau pilih metode lain.</p>
         <?php endif; ?>
     </div>
 
-    <!-- Payment Methods -->
-    <div class="grid gap-4">
-        <?php foreach($methods as $key => $method): ?>
-        <form method="post" class="card-animate">
-            <input type="hidden" name="metode" value="<?= $key ?>">
-            <button type="submit" class="w-full bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md hover:shadow-lg transition-all hover-lift flex items-center gap-4 text-left <?= ($key === 'saldo' && $saldo < $order['harga_snapshot']) ? 'opacity-50 cursor-not-allowed' : '' ?>" <?= ($key === 'saldo' && $saldo < $order['harga_snapshot']) ? 'disabled' : '' ?>>
+    <!-- Form Utama -->
+    <form id="paymentForm" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="metode" id="selectedMethod">
+        
+        <!-- Payment Methods -->
+        <div class="grid gap-4 mb-6">
+            <?php foreach($methods as $key => $method): ?>
+            <button type="button" onclick="showUploadForm('<?= $key ?>', <?= $method['need_upload'] ? 'true' : 'false' ?>)" 
+                class="w-full bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md hover:shadow-lg transition-all hover-lift flex items-center gap-4 text-left <?= ($key === 'saldo' && $saldo < $order['harga_snapshot']) ? 'opacity-50 cursor-not-allowed' : '' ?>"
+                <?= ($key === 'saldo' && $saldo < $order['harga_snapshot']) ? 'disabled' : '' ?>>
                 <div class="w-12 h-12 rounded-xl bg-gradient-to-r <?= $method['color'] ?> flex items-center justify-center">
                     <span class="material-symbols-outlined text-white text-2xl"><?= $method['icon'] ?></span>
                 </div>
@@ -187,15 +220,42 @@ tailwind.config = {
                         <?php if ($key === 'saldo'): ?>
                             <?= $saldo >= $order['harga_snapshot'] ? 'Saldo cukup untuk membayar' : 'Saldo tidak cukup (Rp ' . number_format($saldo, 0, ',', '.') . ')' ?>
                         <?php else: ?>
-                            <?= $key === 'tunai' ? 'Bayar langsung saat mengambil laundry' : 'Transfer via ' . $method['name'] . ', menunggu verifikasi' ?>
+                            <?= $key === 'tunai' ? 'Bayar langsung saat mengambil laundry' : 'Transfer via ' . $method['name'] . ', upload bukti transfer' ?>
                         <?php endif; ?>
                     </p>
                 </div>
                 <span class="material-symbols-outlined text-gray-400">chevron_right</span>
             </button>
-        </form>
-        <?php endforeach; ?>
-    </div>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Upload Form (hidden initially) -->
+        <div id="uploadForm" style="display: none;" class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
+            <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4">Upload Bukti Pembayaran</h3>
+            <p class="text-sm text-gray-500 mb-4">Silakan upload bukti transfer untuk metode <strong id="selectedMethodName">-</strong></p>
+            
+            <div class="mb-4">
+                <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Nomor Transaksi / Referensi</label>
+                <input type="text" name="nomor_referensi" class="w-full border rounded-xl p-3 mt-1 dark:bg-slate-700" placeholder="Masukkan nomor referensi transfer">
+            </div>
+            
+            <div class="mb-4">
+                <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Upload Bukti Transfer (Foto/SS)</label>
+                <input type="file" name="bukti_pembayaran" accept="image/*,.pdf" class="w-full border rounded-xl p-2 mt-1 dark:bg-slate-700" required>
+                <p class="text-xs text-gray-400 mt-1">Format: JPG, PNG, PDF (Max 2MB)</p>
+            </div>
+            
+            <div class="mb-4">
+                <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Catatan (Opsional)</label>
+                <textarea name="catatan" rows="2" class="w-full border rounded-xl p-3 mt-1 dark:bg-slate-700" placeholder="Contoh: Transfer dari BCA an. Budi"></textarea>
+            </div>
+            
+            <div class="flex gap-3">
+                <button type="button" onclick="document.getElementById('uploadForm').style.display='none'" class="flex-1 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 py-2 rounded-xl font-semibold">Batal</button>
+                <button type="submit" class="flex-1 bg-primary text-white py-2 rounded-xl font-semibold hover:bg-primary-dark transition">Kirim Bukti</button>
+            </div>
+        </div>
+    </form>
 
     <!-- Info -->
     <div class="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl">
@@ -204,8 +264,8 @@ tailwind.config = {
             <div>
                 <p class="text-sm font-semibold text-yellow-800 dark:text-yellow-300">Informasi Pembayaran</p>
                 <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                    ✅ <strong>Bayar Pakai Saldo</strong> → Langsung diproses tanpa verifikasi<br>
-                    🕐 <strong>GoPay/DANA/Transfer Bank</strong> → Menunggu verifikasi Supervisor<br>
+                    ✅ <strong>Bayar Pakai Saldo</strong> → Langsung diproses<br>
+                    📤 <strong>GoPay/DANA/Transfer Bank</strong> → Upload bukti, menunggu verifikasi<br>
                     💰 <strong>Tunai</strong> → Bayar saat mengambil laundry
                 </p>
             </div>
