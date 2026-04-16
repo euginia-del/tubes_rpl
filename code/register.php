@@ -20,11 +20,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nama'], $_POST['email
     if ($stmt->fetchColumn() > 0) {
         set_flash('error', 'Email sudah terdaftar.');
     } else {
-        // Hash password dengan SHA256
-        $hashed_password = hash('sha256', $password);
-        
+        // Simpan password plain text
         $stmt = $db->prepare('INSERT INTO user (nama, email, password, no_hp, alamat, role, saldo) VALUES (?, ?, ?, ?, ?, "customer", 0)');
-        if ($stmt->execute([$nama, $email, $hashed_password, $no_hp, $alamat])) {
+        if ($stmt->execute([$nama, $email, $password, $no_hp, $alamat])) {
             set_flash('success', 'Akun berhasil dibuat. Silakan login.');
             header('Location: login.php');
             exit;
@@ -83,12 +81,6 @@ tailwind.config = {
             <?php if ($error = get_flash('error')): ?>
             <div class="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-3">
                 <p class="text-red-700 dark:text-red-300 text-sm"><?= htmlspecialchars($error) ?></p>
-            </div>
-            <?php endif; ?>
-
-            <?php if ($success = get_flash('success')): ?>
-            <div class="mb-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3">
-                <p class="text-emerald-700 dark:text-emerald-300 text-sm"><?= htmlspecialchars($success) ?></p>
             </div>
             <?php endif; ?>
 

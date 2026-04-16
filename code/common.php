@@ -28,11 +28,6 @@ function get_db() {
     return $db;
 }
 
-// Fungsi untuk hash password
-function hash_password($password) {
-    return hash('sha256', $password);
-}
-
 // Role-based access control
 function require_customer($db = null) {
     $db = $db ?: get_db();
@@ -82,13 +77,11 @@ function currentUser($db = null) {
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-// LOGIN dengan hash password
+// LOGIN FUNCTION - PLAIN TEXT
 function loginUser($email, $password) {
     $db = get_db();
-    $hashed_password = hash_password($password);
-    
     $stmt = $db->prepare('SELECT * FROM user WHERE email = ? AND password = ?');
-    $stmt->execute([$email, $hashed_password]);
+    $stmt->execute([$email, $password]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
     return $user ? $user : false;
@@ -272,25 +265,6 @@ function get_processed_orders_count($db = null) {
     $db = $db ?: get_db();
     $stmt = $db->query('SELECT COUNT(*) FROM orders WHERE status_order = "proses"');
     return $stmt->fetchColumn();
-}
-
-// REGISTER dengan hash password
-function registerUser($nama, $email, $password, $no_hp, $alamat) {
-    $db = get_db();
-    
-    // Cek email sudah terdaftar
-    $stmt = $db->prepare('SELECT COUNT(*) FROM user WHERE email = ?');
-    $stmt->execute([$email]);
-    if ($stmt->fetchColumn() > 0) {
-        return false;
-    }
-    
-    $hashed_password = hash_password($password);
-    
-    $stmt = $db->prepare('INSERT INTO user (nama, email, password, no_hp, alamat, role, saldo) 
-        VALUES (?, ?, ?, ?, ?, "customer", 0)');
-    
-    return $stmt->execute([$nama, $email, $hashed_password, $no_hp, $alamat]);
 }
 
 function global_route_script() {

@@ -21,20 +21,18 @@ if (isset($_GET['delete'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
         if ($_POST['action'] === 'add') {
-            // Hash password untuk user baru
-            $hashed_password = hash('sha256', $_POST['password']);
+            // Simpan password plain text
             $stmt = $db->prepare('INSERT INTO user (nama, email, password, no_hp, alamat, role) VALUES (?, ?, ?, ?, ?, ?)');
-            if ($stmt->execute([$_POST['nama'], $_POST['email'], $hashed_password, $_POST['no_hp'], $_POST['alamat'], $_POST['role']])) {
+            if ($stmt->execute([$_POST['nama'], $_POST['email'], $_POST['password'], $_POST['no_hp'], $_POST['alamat'], $_POST['role']])) {
                 $message = 'User berhasil ditambahkan';
             } else {
                 $error = 'Gagal menambahkan user';
             }
         } elseif ($_POST['action'] === 'edit') {
-            // Jika password diisi, update password dengan hash
+            // Jika password diisi, update password
             if (!empty($_POST['password'])) {
-                $hashed_password = hash('sha256', $_POST['password']);
                 $stmt = $db->prepare('UPDATE user SET nama = ?, email = ?, password = ?, no_hp = ?, alamat = ?, role = ? WHERE id_user = ?');
-                $stmt->execute([$_POST['nama'], $_POST['email'], $hashed_password, $_POST['no_hp'], $_POST['alamat'], $_POST['role'], $_POST['id_user']]);
+                $stmt->execute([$_POST['nama'], $_POST['email'], $_POST['password'], $_POST['no_hp'], $_POST['alamat'], $_POST['role'], $_POST['id_user']]);
             } else {
                 // Update tanpa mengubah password
                 $stmt = $db->prepare('UPDATE user SET nama = ?, email = ?, no_hp = ?, alamat = ?, role = ? WHERE id_user = ?');
@@ -250,8 +248,8 @@ tailwind.config = {
                 </div>
                 <div>
                     <label class="text-sm font-semibold">Password</label>
-                    <input type="password" name="password" id="userPassword" class="w-full border rounded-xl p-2 mt-1 dark:bg-slate-700" placeholder="Min 6 karakter (kosongkan jika tidak diubah)">
-                    <p class="text-xs text-gray-400 mt-1">Minimal 6 karakter</p>
+                    <input type="text" name="password" id="userPassword" class="w-full border rounded-xl p-2 mt-1 dark:bg-slate-700" placeholder="Min 6 karakter">
+                    <p class="text-xs text-gray-400 mt-1">Kosongkan jika tidak ingin mengubah password</p>
                 </div>
                 <div>
                     <label class="text-sm font-semibold">Phone</label>
@@ -284,7 +282,7 @@ function showAddModal() {
     document.getElementById('userName').value = '';
     document.getElementById('userEmail').value = '';
     document.getElementById('userPassword').value = '';
-    document.getElementById('userPassword').required = true;
+    document.getElementById('userPassword').required = false;
     document.getElementById('userPhone').value = '';
     document.getElementById('userAddress').value = '';
     document.getElementById('userRole').value = 'customer';
@@ -298,7 +296,6 @@ function editUser(user) {
     document.getElementById('userName').value = user.nama;
     document.getElementById('userEmail').value = user.email;
     document.getElementById('userPassword').value = '';
-    document.getElementById('userPassword').required = false;
     document.getElementById('userPassword').placeholder = 'Kosongkan jika tidak diubah';
     document.getElementById('userPhone').value = user.no_hp || '';
     document.getElementById('userAddress').value = user.alamat || '';
