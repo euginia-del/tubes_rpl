@@ -2,23 +2,41 @@
 require_once 'common.php';
 require_worker();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['order_id'])) {
-    if ($_POST['action'] === 'process_order') {
-        update_order_status($_POST['order_id'], 'proses');
-        set_flash('success', 'Order ' . $_POST['order_id'] . ' sedang diproses.');
-        header('Location: worker.php');
-        exit;
+$db = get_db();
+
+// Handle status update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'], $_POST['new_status'])) {
+    $orderId = $_POST['order_id'];
+    $newStatus = $_POST['new_status'];
+    if (update_order_status($orderId, $newStatus)) {
+        set_flash('success', 'Order #' . $orderId . ' status diubah menjadi ' . $newStatus);
+    } else {
+        set_flash('error', 'Gagal mengubah status order');
     }
-    if ($_POST['action'] === 'complete_order') {
-        update_order_status($_POST['order_id'], 'selesai');
-        set_flash('success', 'Order ' . $_POST['order_id'] . ' selesai.');
-        header('Location: worker.php');
-        exit;
-    }
+    header('Location: worker.php');
+    exit;
 }
 
-$pendingOrders = get_pending_orders();
-$processOrders = get_orders();
+// Get all orders
+$stmt = $db->prepare('
+    SELECT o.*, u.nama as customer_name, l.nama_layanan as service_name 
+    FROM orders o 
+    LEFT JOIN user u ON o.id_user = u.id_user 
+    LEFT JOIN layanan l ON o.id_layanan = l.id_layanan 
+    ORDER BY o.tanggal_order DESC
+');
+$stmt->execute();
+$allOrders = $stmt->fetchAll();
+
+$pendingOrders = array_filter($allOrders, function($o) { 
+    return $o['status_order'] === 'pending'; 
+});
+$processOrders = array_filter($allOrders, function($o) { 
+    return $o['status_order'] === 'proses'; 
+});
+$completedOrders = array_filter($allOrders, function($o) { 
+    return $o['status_order'] === 'selesai'; 
+});
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -83,12 +101,7 @@ tailwind.config = {
 <!-- Mobile Header -->
 <div class="md:hidden bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-40">
     <div class="flex items-center justify-between px-4 py-3">
-        <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
-                <span class="material-symbols-outlined text-white text-lg">handyman</span>
-            </div>
-            <span class="text-lg font-bold text-primary">Worker Panel</span>
-        </div>
+        <span class="text-lg font-bold text-primary">Worker Panel</span>
         <button id="themeToggle" class="text-xs px-3 py-1 rounded-full border dark:border-slate-600">🌙</button>
     </div>
 </div>
@@ -99,81 +112,93 @@ tailwind.config = {
         <h1 class="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-6">Worker Dashboard</h1>
 
         <?php if ($msg = get_flash('success')): ?>
-        <div class="mb-6 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 rounded-xl p-4">
+        <div class="mb-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 rounded-xl p-3">
             <p class="text-emerald-700 dark:text-emerald-300"><?= htmlspecialchars($msg) ?></p>
         </div>
         <?php endif; ?>
 
+        <?php if ($error = get_flash('error')): ?>
+        <div class="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 rounded-xl p-3">
+            <p class="text-red-700 dark:text-red-300"><?= htmlspecialchars($error) ?></p>
+        </div>
+        <?php endif; ?>
+
         <!-- Stats -->
-        <div class="grid grid-cols-2 gap-4 mb-8">
-            <div class="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-5 text-white shadow-lg card-animate">
-                <div>
-                    <p class="text-amber-100 text-sm">Pending Orders</p>
-                    <p class="text-3xl font-bold mt-1"><?= count($pendingOrders) ?></p>
-                </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg">
+                <p class="text-gray-500 dark:text-gray-400 text-sm">Total Orders</p>
+                <p class="text-2xl font-bold text-gray-800 dark:text-white"><?= count($allOrders) ?></p>
             </div>
-            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 text-white shadow-lg card-animate">
-                <div>
-                    <p class="text-emerald-100 text-sm">In Progress</p>
-                    <p class="text-3xl font-bold mt-1"><?= count(array_filter($pendingOrders, fn($o) => $o['status_order'] === 'proses')) ?></p>
-                </div>
+            <div class="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-5 text-white shadow-lg">
+                <p class="text-amber-100 text-sm">Pending</p>
+                <p class="text-2xl font-bold"><?= count($pendingOrders) ?></p>
             </div>
-        </div>
-
-        <!-- Pending Orders -->
-        <div class="mb-8">
-            <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-4">Pending Orders</h2>
-            <div class="space-y-3">
-                <?php foreach ($pendingOrders as $order): ?>
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm card-animate">
-                    <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-                        <p class="font-bold text-gray-800 dark:text-white">#<?= $order['id_order'] ?></p>
-                        <span class="badge badge-warning">pending</span>
-                    </div>
-                    <p class="text-gray-600 dark:text-gray-300 text-sm">Customer: <?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?></p>
-                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-3"><?= $order['service_name'] ?? 'Layanan' ?> • <?= $order['berat_cucian'] ?> kg</p>
-                    <form method="post">
-                        <input type="hidden" name="order_id" value="<?= $order['id_order'] ?>">
-                        <input type="hidden" name="action" value="process_order">
-                        <button class="w-full bg-gradient-to-r from-primary to-secondary text-white py-3 rounded-xl font-semibold hover-lift transition">Process Order</button>
-                    </form>
-                </div>
-                <?php endforeach; ?>
-                <?php if (empty($pendingOrders)): ?>
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-8 text-center">
-                    <span class="material-symbols-outlined text-5xl text-gray-400">check_circle</span>
-                    <p class="text-gray-500 dark:text-gray-400 mt-2">No pending orders</p>
-                </div>
-                <?php endif; ?>
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-5 text-white shadow-lg">
+                <p class="text-purple-100 text-sm">In Process</p>
+                <p class="text-2xl font-bold"><?= count($processOrders) ?></p>
+            </div>
+            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 text-white shadow-lg">
+                <p class="text-emerald-100 text-sm">Completed</p>
+                <p class="text-2xl font-bold"><?= count($completedOrders) ?></p>
             </div>
         </div>
 
-        <!-- Orders In Progress -->
-        <div>
-            <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-4">Orders In Progress</h2>
-            <div class="space-y-3">
-                <?php 
-                $inProgress = array_filter($pendingOrders, fn($o) => $o['status_order'] === 'proses');
-                foreach ($inProgress as $order): ?>
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm card-animate">
-                    <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-                        <p class="font-bold text-gray-800 dark:text-white">#<?= $order['id_order'] ?></p>
-                        <span class="badge badge-info">proses</span>
-                    </div>
-                    <p class="text-gray-600 dark:text-gray-300 text-sm mb-3">Customer: <?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?></p>
-                    <form method="post">
-                        <input type="hidden" name="order_id" value="<?= $order['id_order'] ?>">
-                        <input type="hidden" name="action" value="complete_order">
-                        <button class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-semibold transition">Complete Order</button>
-                    </form>
-                </div>
-                <?php endforeach; ?>
-                <?php if (empty($inProgress)): ?>
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-8 text-center">
-                    <span class="material-symbols-outlined text-5xl text-gray-400">pending</span>
-                    <p class="text-gray-500 dark:text-gray-400 mt-2">No orders in progress</p>
-                </div>
-                <?php endif; ?>
+        <!-- All Orders Table -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden">
+            <div class="px-6 py-4 border-b dark:border-slate-700">
+                <h2 class="text-lg font-bold text-gray-800 dark:text-white">All Orders</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Click dropdown to change order status</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-slate-700">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">ID</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Customer</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Service</th>
+                            <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Weight</th>
+                            <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Total</th>
+                            <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Status</th>
+                            <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($allOrders)): ?>
+                        <tr>
+                            <td colspan="7" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                                No orders found
+                            </td>
+                        </tr>
+                        <?php else: ?>
+                            <?php foreach($allOrders as $order): ?>
+                            <tr class="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                                <td class="px-4 py-3 font-medium text-gray-800 dark:text-white">#<?= $order['id_order'] ?></td>
+                                <td class="px-4 py-3 text-gray-600 dark:text-gray-300"><?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?></td>
+                                <td class="px-4 py-3 text-gray-600 dark:text-gray-300"><?= htmlspecialchars($order['service_name'] ?? 'Layanan') ?></td>
+                                <td class="px-4 py-3 text-center text-gray-600 dark:text-gray-300"><?= $order['berat_cucian'] ?> kg</td>
+                                <td class="px-4 py-3 text-right text-primary font-semibold">Rp <?= number_format($order['harga_snapshot'],0,',','.') ?></td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="badge <?= $order['status_order'] == 'selesai' ? 'badge-success' : ($order['status_order'] == 'proses' ? 'badge-info' : 'badge-warning') ?>">
+                                        <?= $order['status_order'] ?>
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <form method="post" class="inline-block">
+                                        <input type="hidden" name="order_id" value="<?= $order['id_order'] ?>">
+                                        <select name="new_status" onchange="this.form.submit()" 
+                                            class="text-sm border rounded-lg px-3 py-1.5 cursor-pointer
+                                            <?= $order['status_order'] == 'selesai' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : ($order['status_order'] == 'proses' ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-amber-50 border-amber-300 text-amber-700') ?>">
+                                            <option value="pending" <?= $order['status_order'] == 'pending' ? 'selected' : '' ?>>Pending</option>
+                                            <option value="proses" <?= $order['status_order'] == 'proses' ? 'selected' : '' ?>>Proses</option>
+                                            <option value="selesai" <?= $order['status_order'] == 'selesai' ? 'selected' : '' ?>>Selesai</option>
+                                        </select>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
