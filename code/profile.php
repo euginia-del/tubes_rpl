@@ -15,7 +15,7 @@ $db = get_db();
 $role = $user['role'];
 $userId = $user['id_user'];
 
-// ========== AMBIL ORDER MILIK USER INI ==========
+// ========== MY ORDER STATISTICS (ORDER MILIK USER INI) ==========
 $stmt = $db->prepare('SELECT * FROM orders WHERE id_user = ? ORDER BY tanggal_order DESC');
 $stmt->execute([$userId]);
 $myOrders = $stmt->fetchAll();
@@ -38,25 +38,22 @@ foreach ($myOrders as $order) {
 }
 $myActiveOrders = $myPendingOrders + $myProcessOrders;
 
-// ========== UNTUK SYSTEM OVERVIEW (HANYA ADMIN/SUPERVISOR/WORKER) ==========
-$allTotalOrders = 0;
+// ========== SYSTEM OVERVIEW (SEMUA ORDER DI SISTEM) ==========
+$stmt = $db->query('SELECT * FROM orders ORDER BY tanggal_order DESC');
+$allOrders = $stmt->fetchAll();
+
+$allTotalOrders = count($allOrders);
 $allPendingOrders = 0;
 $allProcessOrders = 0;
 $allCompletedOrders = 0;
 $allTotalRevenue = 0;
 
-if ($role !== 'customer') {
-    $stmt = $db->query('SELECT * FROM orders ORDER BY tanggal_order DESC');
-    $allOrders = $stmt->fetchAll();
-    
-    $allTotalOrders = count($allOrders);
-    foreach ($allOrders as $order) {
-        if ($order['status_order'] === 'pending') $allPendingOrders++;
-        elseif ($order['status_order'] === 'proses') $allProcessOrders++;
-        elseif ($order['status_order'] === 'selesai') {
-            $allCompletedOrders++;
-            $allTotalRevenue += $order['harga_snapshot'];
-        }
+foreach ($allOrders as $order) {
+    if ($order['status_order'] === 'pending') $allPendingOrders++;
+    elseif ($order['status_order'] === 'proses') $allProcessOrders++;
+    elseif ($order['status_order'] === 'selesai') {
+        $allCompletedOrders++;
+        $allTotalRevenue += $order['harga_snapshot'];
     }
 }
 ?>
@@ -92,34 +89,73 @@ tailwind.config = {
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 min-h-screen pb-20 md:pb-0">
 
-<!-- Desktop Sidebar -->
+<!-- Desktop Sidebar - sesuai role -->
 <div class="hidden md:flex md:fixed md:inset-y-0 md:left-0 md:w-72 bg-white dark:bg-slate-800 shadow-xl flex-col">
     <div class="flex items-center justify-center p-6 border-b dark:border-slate-700">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
                 <span class="material-symbols-outlined text-white text-xl">local_laundry_service</span>
             </div>
-            <span class="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">LaundryFresh</span>
+            <span class="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                <?= $role === 'admin' ? 'Admin Panel' : ($role === 'supervisor' ? 'Supervisor Panel' : ($role === 'worker' ? 'Worker Panel' : 'LaundryFresh')) ?>
+            </span>
         </div>
     </div>
     
     <nav class="flex-1 p-4 space-y-2">
-        <a href="dashboard.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-            <span class="material-symbols-outlined">dashboard</span>
-            <span>Dashboard</span>
-        </a>
-        <a href="neworder.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-            <span class="material-symbols-outlined">add_shopping_cart</span>
-            <span>New Order</span>
-        </a>
-        <a href="history.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-            <span class="material-symbols-outlined">receipt_long</span>
-            <span>History</span>
-        </a>
-        <a href="price.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-            <span class="material-symbols-outlined">price_check</span>
-            <span>Pricing</span>
-        </a>
+        <?php if ($role === 'customer'): ?>
+            <a href="dashboard.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">dashboard</span>
+                <span>Dashboard</span>
+            </a>
+            <a href="neworder.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">add_shopping_cart</span>
+                <span>New Order</span>
+            </a>
+            <a href="history.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">receipt_long</span>
+                <span>History</span>
+            </a>
+            <a href="price.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">price_check</span>
+                <span>Pricing</span>
+            </a>
+        <?php elseif ($role === 'worker'): ?>
+            <a href="worker.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">dashboard</span>
+                <span>Dashboard</span>
+            </a>
+        <?php elseif ($role === 'supervisor'): ?>
+            <a href="supervisor.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">verified</span>
+                <span>Verify Payments</span>
+            </a>
+            <a href="reports.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">assessment</span>
+                <span>Reports</span>
+            </a>
+        <?php elseif ($role === 'admin'): ?>
+            <a href="admin.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">dashboard</span>
+                <span>Dashboard</span>
+            </a>
+            <a href="reports.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">assessment</span>
+                <span>Reports</span>
+            </a>
+            <a href="history.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">receipt_long</span>
+                <span>All Orders</span>
+            </a>
+            <a href="price.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">price_check</span>
+                <span>Services</span>
+            </a>
+            <a href="users.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">group</span>
+                <span>Users</span>
+            </a>
+        <?php endif; ?>
         <a href="profile.php" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary font-semibold">
             <span class="material-symbols-outlined">account_circle</span>
             <span>Profile</span>
@@ -162,7 +198,7 @@ tailwind.config = {
                 <div>
                     <h2 class="text-xl font-bold text-gray-800 dark:text-white"><?= htmlspecialchars($user['nama']) ?></h2>
                     <p class="text-gray-500 dark:text-gray-400"><?= htmlspecialchars($user['email']) ?></p>
-                    <span class="badge badge-secondary mt-1">
+                    <span class="badge <?= $role == 'admin' ? 'badge-success' : ($role == 'supervisor' ? 'badge-info' : 'badge-secondary') ?> mt-1">
                         <?= strtoupper($role) ?>
                     </span>
                 </div>
@@ -222,7 +258,7 @@ tailwind.config = {
             </div>
         </div>
 
-        <!-- ========== SYSTEM OVERVIEW (HANYA UNTUK ADMIN/SUPERVISOR/WORKER) ========== -->
+        <!-- ========== SYSTEM OVERVIEW (UNTUK ADMIN/SUPERVISOR/WORKER SAJA) ========== -->
         <?php if ($role === 'admin' || $role === 'supervisor' || $role === 'worker'): ?>
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 mb-6">
             <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
