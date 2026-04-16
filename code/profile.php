@@ -15,47 +15,48 @@ $db = get_db();
 $role = $user['role'];
 $userId = $user['id_user'];
 
-// ========== UNTUK CUSTOMER SAJA (ORDERS MILIKNYA) ==========
-$myTotalOrders = 0;
+// ========== AMBIL ORDER MILIK USER INI ==========
+$stmt = $db->prepare('SELECT * FROM orders WHERE id_user = ? ORDER BY tanggal_order DESC');
+$stmt->execute([$userId]);
+$myOrders = $stmt->fetchAll();
+
+$myTotalOrders = count($myOrders);
 $myPendingOrders = 0;
 $myProcessOrders = 0;
 $myCompletedOrders = 0;
 $myTotalSpent = 0;
-$myActiveOrders = 0;
 
-if ($role === 'customer') {
-    $stmt = $db->prepare('SELECT * FROM orders WHERE id_user = ? ORDER BY tanggal_order DESC');
-    $stmt->execute([$userId]);
-    $myOrders = $stmt->fetchAll();
-    
-    $myTotalOrders = count($myOrders);
-    foreach ($myOrders as $order) {
-        if ($order['status_order'] === 'pending') $myPendingOrders++;
-        elseif ($order['status_order'] === 'proses') $myProcessOrders++;
-        elseif ($order['status_order'] === 'selesai') {
-            $myCompletedOrders++;
-            $myTotalSpent += $order['harga_snapshot'];
-        }
+foreach ($myOrders as $order) {
+    if ($order['status_order'] === 'pending') {
+        $myPendingOrders++;
+    } elseif ($order['status_order'] === 'proses') {
+        $myProcessOrders++;
+    } elseif ($order['status_order'] === 'selesai') {
+        $myCompletedOrders++;
+        $myTotalSpent += $order['harga_snapshot'];
     }
-    $myActiveOrders = $myPendingOrders + $myProcessOrders;
 }
+$myActiveOrders = $myPendingOrders + $myProcessOrders;
 
-// ========== UNTUK SEMUA ROLE (SYSTEM OVERVIEW) ==========
-$stmt = $db->query('SELECT * FROM orders ORDER BY tanggal_order DESC');
-$allOrders = $stmt->fetchAll();
-
-$allTotalOrders = count($allOrders);
+// ========== UNTUK SYSTEM OVERVIEW (HANYA ADMIN/SUPERVISOR/WORKER) ==========
+$allTotalOrders = 0;
 $allPendingOrders = 0;
 $allProcessOrders = 0;
 $allCompletedOrders = 0;
 $allTotalRevenue = 0;
 
-foreach ($allOrders as $order) {
-    if ($order['status_order'] === 'pending') $allPendingOrders++;
-    elseif ($order['status_order'] === 'proses') $allProcessOrders++;
-    elseif ($order['status_order'] === 'selesai') {
-        $allCompletedOrders++;
-        $allTotalRevenue += $order['harga_snapshot'];
+if ($role !== 'customer') {
+    $stmt = $db->query('SELECT * FROM orders ORDER BY tanggal_order DESC');
+    $allOrders = $stmt->fetchAll();
+    
+    $allTotalOrders = count($allOrders);
+    foreach ($allOrders as $order) {
+        if ($order['status_order'] === 'pending') $allPendingOrders++;
+        elseif ($order['status_order'] === 'proses') $allProcessOrders++;
+        elseif ($order['status_order'] === 'selesai') {
+            $allCompletedOrders++;
+            $allTotalRevenue += $order['harga_snapshot'];
+        }
     }
 }
 ?>
@@ -87,7 +88,6 @@ tailwind.config = {
 .stat-card-emerald { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
 .stat-card-sky { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
 .stat-card-rose { background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%); }
-.stat-card-indigo { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
 </style>
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 min-h-screen pb-20 md:pb-0">
@@ -99,66 +99,27 @@ tailwind.config = {
             <div class="w-10 h-10 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
                 <span class="material-symbols-outlined text-white text-xl">local_laundry_service</span>
             </div>
-            <span class="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                <?= $role === 'admin' ? 'Admin Panel' : ($role === 'supervisor' ? 'Supervisor Panel' : ($role === 'worker' ? 'Worker Panel' : 'LaundryFresh')) ?>
-            </span>
+            <span class="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">LaundryFresh</span>
         </div>
     </div>
     
     <nav class="flex-1 p-4 space-y-2">
-        <?php if ($role === 'customer'): ?>
-            <a href="dashboard.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">dashboard</span>
-                <span>Dashboard</span>
-            </a>
-            <a href="neworder.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">add_shopping_cart</span>
-                <span>New Order</span>
-            </a>
-            <a href="history.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">receipt_long</span>
-                <span>History</span>
-            </a>
-            <a href="price.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">price_check</span>
-                <span>Pricing</span>
-            </a>
-        <?php elseif ($role === 'worker'): ?>
-            <a href="worker.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">dashboard</span>
-                <span>Dashboard</span>
-            </a>
-        <?php elseif ($role === 'supervisor'): ?>
-            <a href="supervisor.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">verified</span>
-                <span>Verify Payments</span>
-            </a>
-            <a href="reports.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">assessment</span>
-                <span>Reports</span>
-            </a>
-        <?php elseif ($role === 'admin'): ?>
-            <a href="admin.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">dashboard</span>
-                <span>Dashboard</span>
-            </a>
-            <a href="reports.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">assessment</span>
-                <span>Reports</span>
-            </a>
-            <a href="history.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">receipt_long</span>
-                <span>All Orders</span>
-            </a>
-            <a href="price.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">price_check</span>
-                <span>Services</span>
-            </a>
-            <a href="users.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">group</span>
-                <span>Users</span>
-            </a>
-        <?php endif; ?>
+        <a href="dashboard.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">dashboard</span>
+            <span>Dashboard</span>
+        </a>
+        <a href="neworder.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">add_shopping_cart</span>
+            <span>New Order</span>
+        </a>
+        <a href="history.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">receipt_long</span>
+            <span>History</span>
+        </a>
+        <a href="price.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">price_check</span>
+            <span>Pricing</span>
+        </a>
         <a href="profile.php" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary font-semibold">
             <span class="material-symbols-outlined">account_circle</span>
             <span>Profile</span>
@@ -201,7 +162,7 @@ tailwind.config = {
                 <div>
                     <h2 class="text-xl font-bold text-gray-800 dark:text-white"><?= htmlspecialchars($user['nama']) ?></h2>
                     <p class="text-gray-500 dark:text-gray-400"><?= htmlspecialchars($user['email']) ?></p>
-                    <span class="badge <?= $role == 'admin' ? 'badge-success' : ($role == 'supervisor' ? 'badge-info' : 'badge-secondary') ?> mt-1">
+                    <span class="badge badge-secondary mt-1">
                         <?= strtoupper($role) ?>
                     </span>
                 </div>
@@ -218,9 +179,7 @@ tailwind.config = {
             </div>
         </div>
 
-        <!-- ========== UNTUK CUSTOMER SAJA ========== -->
-        <?php if ($role === 'customer'): ?>
-        <!-- My Order Statistics -->
+        <!-- ========== MY ORDER STATISTICS (UNTUK SEMUA ROLE) ========== -->
         <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4">My Order Statistics</h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div class="stat-card-blue rounded-2xl p-5 text-white shadow-lg transform transition hover:scale-105">
@@ -241,7 +200,7 @@ tailwind.config = {
             </div>
         </div>
 
-        <!-- Additional Stats for Customer -->
+        <!-- Additional Stats (Total Spent & Active Orders) -->
         <div class="grid md:grid-cols-2 gap-6 mb-8">
             <div class="stat-card-sky rounded-2xl p-5 text-white shadow-lg">
                 <div class="flex items-center justify-between">
@@ -262,13 +221,13 @@ tailwind.config = {
                 </div>
             </div>
         </div>
-        <?php endif; ?>
 
-        <!-- ========== SYSTEM OVERVIEW (UNTUK SEMUA ROLE) ========== -->
+        <!-- ========== SYSTEM OVERVIEW (HANYA UNTUK ADMIN/SUPERVISOR/WORKER) ========== -->
+        <?php if ($role === 'admin' || $role === 'supervisor' || $role === 'worker'): ?>
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 mb-6">
             <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                 <span class="material-symbols-outlined text-primary">insights</span>
-                <?= $role === 'customer' ? 'System Overview' : 'System Overview (All Orders)' ?>
+                System Overview (All Orders)
             </h3>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div class="text-center p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl text-white">
@@ -289,7 +248,6 @@ tailwind.config = {
                 </div>
             </div>
             
-            <!-- Total Revenue (untuk Admin & Supervisor) -->
             <?php if ($role === 'admin' || $role === 'supervisor'): ?>
             <div class="mt-4 p-4 bg-gradient-to-r from-primary to-secondary rounded-xl text-white">
                 <div class="flex justify-between items-center">
@@ -299,6 +257,7 @@ tailwind.config = {
             </div>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
 
         <!-- Logout Button -->
         <form method="post">
