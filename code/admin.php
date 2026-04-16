@@ -8,92 +8,201 @@ $completed = get_completed_orders_count($db);
 $pending = get_pending_orders_count($db);
 $totalUsers = get_user_count($db);
 $allOrders = get_all_orders($db);
+
+// Get monthly stats
+$stmt = $db->query('SELECT COUNT(*) as count, MONTH(tanggal_order) as month FROM orders WHERE YEAR(tanggal_order) = YEAR(NOW()) GROUP BY MONTH(tanggal_order)');
+$monthlyStats = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Admin Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>Admin Dashboard - LaundryApp</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css">
 <script>
-tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary": "#2094f3","background-light": "#f5f7f8","background-dark": "#101a22"}, fontFamily: {"display": ["Inter"]}}}};
+tailwind.config = {
+    darkMode: "class",
+    theme: {
+        extend: {
+            colors: { "primary": "#6366f1", "secondary": "#8b5cf6" },
+            fontFamily: { "display": ["Inter", "sans-serif"] }
+        }
+    }
+}
 </script>
 </head>
-<body class="bg-background-light dark:bg-background-dark font-display">
-<div class="max-w-md mx-auto min-h-screen bg-white dark:bg-slate-900 shadow-xl pb-24">
-<div class="px-4 py-4 flex items-center justify-between border-b">
-<div class="bg-primary/10 rounded-lg p-2">
-<span class="material-symbols-outlined text-primary">admin_panel_settings</span>
-</div>
-<h2 class="text-lg font-bold flex-1 text-center">Admin Panel</h2>
-<button id="themeToggle" class="text-xs px-2 py-1 rounded-full border">Mode</button>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 min-h-screen pb-20 md:pb-0">
+
+<!-- Desktop Sidebar -->
+<div class="hidden md:flex md:fixed md:inset-y-0 md:left-0 md:w-72 bg-white dark:bg-slate-800 shadow-xl flex-col">
+    <div class="flex items-center justify-center p-6 border-b dark:border-slate-700">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
+                <span class="material-symbols-outlined text-white text-xl">local_laundry_service</span>
+            </div>
+            <span class="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Admin Panel</span>
+        </div>
+    </div>
+    
+    <nav class="flex-1 p-4 space-y-2">
+        <a href="admin.php" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary font-semibold">
+            <span class="material-symbols-outlined">dashboard</span>
+            <span>Dashboard</span>
+        </a>
+        <a href="history.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">receipt_long</span>
+            <span>All Orders</span>
+        </a>
+        <a href="price.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">price_check</span>
+            <span>Services</span>
+        </a>
+        <a href="profile.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">account_circle</span>
+            <span>Profile</span>
+        </a>
+    </nav>
+    
+    <div class="p-4 border-t dark:border-slate-700">
+        <div class="flex items-center gap-3 px-4 py-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
+                <span class="material-symbols-outlined text-white text-xl">admin_panel_settings</span>
+            </div>
+            <div class="flex-1">
+                <p class="text-sm font-semibold text-gray-800 dark:text-white">Administrator</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Admin Access</p>
+            </div>
+            <button id="themeToggle" class="text-xs px-2 py-1 rounded-full border dark:border-slate-600">🌙</button>
+        </div>
+    </div>
 </div>
 
-<!-- Stats -->
-<div class="grid grid-cols-2 gap-4 p-4">
-<div class="bg-primary/5 rounded-xl p-4">
-<span class="material-symbols-outlined text-primary">receipt_long</span>
-<p class="text-xs text-slate-500 mt-1">Total Orders</p>
-<p class="text-2xl font-bold"><?= $totalOrders ?></p>
-</div>
-<div class="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4">
-<span class="material-symbols-outlined text-emerald-600">task_alt</span>
-<p class="text-xs text-slate-500 mt-1">Completed</p>
-<p class="text-2xl font-bold"><?= $completed ?></p>
-</div>
-<div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4">
-<span class="material-symbols-outlined text-yellow-600">schedule</span>
-<p class="text-xs text-slate-500 mt-1">Pending</p>
-<p class="text-2xl font-bold"><?= $pending ?></p>
-</div>
-<div class="bg-slate-100 dark:bg-slate-800 rounded-xl p-4">
-<span class="material-symbols-outlined text-slate-500">group</span>
-<p class="text-xs text-slate-500 mt-1">Users</p>
-<p class="text-2xl font-bold"><?= $totalUsers ?></p>
-</div>
+<!-- Mobile Header -->
+<div class="md:hidden bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-40">
+    <div class="flex items-center justify-between px-4 py-3">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
+                <span class="material-symbols-outlined text-white text-lg">admin_panel_settings</span>
+            </div>
+            <span class="text-lg font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Admin Panel</span>
+        </div>
+        <button id="themeToggle" class="text-xs px-3 py-1 rounded-full border dark:border-slate-600">🌙</button>
+    </div>
 </div>
 
-<!-- Management Cards -->
-<div class="px-4 space-y-3">
-<a href="price.php" class="block p-4 bg-gradient-to-r from-primary to-blue-600 text-white rounded-xl shadow-lg">
-<span class="material-symbols-outlined float-left mr-3">payment</span>
-<h3 class="font-bold">Pricing & Services</h3>
-<p class="text-sm opacity-90">Manage services & pricing</p>
-</a>
-<a href="history.php" class="block p-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl shadow-lg">
-<span class="material-symbols-outlined float-left mr-3">receipt_long</span>
-<h3 class="font-bold">All Orders</h3>
-<p class="text-sm opacity-90">View complete order history</p>
-</a>
+<!-- Main Content -->
+<div class="md:ml-72">
+    <div class="container-responsive py-6">
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-6">Admin Dashboard</h1>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg card-animate">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">Total Orders</p>
+                        <p class="text-2xl font-bold text-gray-800 dark:text-white mt-1"><?= $totalOrders ?></p>
+                    </div>
+                    <span class="material-symbols-outlined text-3xl text-primary">receipt_long</span>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg card-animate">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">Completed</p>
+                        <p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1"><?= $completed ?></p>
+                    </div>
+                    <span class="material-symbols-outlined text-3xl text-emerald-500">task_alt</span>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg card-animate">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">Pending</p>
+                        <p class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1"><?= $pending ?></p>
+                    </div>
+                    <span class="material-symbols-outlined text-3xl text-amber-500">schedule</span>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg card-animate">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">Total Users</p>
+                        <p class="text-2xl font-bold text-gray-800 dark:text-white mt-1"><?= $totalUsers ?></p>
+                    </div>
+                    <span class="material-symbols-outlined text-3xl text-primary">group</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <a href="price.php" class="bg-gradient-to-r from-primary to-blue-600 rounded-2xl p-5 text-white shadow-lg hover-lift card-animate">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-2xl">payment</span>
+                    <div>
+                        <h3 class="font-bold">Pricing & Services</h3>
+                        <p class="text-sm opacity-90">Manage services & pricing</p>
+                    </div>
+                </div>
+            </a>
+            <a href="history.php" class="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-2xl p-5 text-white shadow-lg hover-lift card-animate">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-2xl">receipt_long</span>
+                    <div>
+                        <h3 class="font-bold">All Orders</h3>
+                        <p class="text-sm opacity-90">View complete order history</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Recent Orders -->
+        <div>
+            <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-4">Recent Orders</h2>
+            <div class="space-y-3">
+                <?php foreach (array_slice($allOrders, 0, 5) as $order): ?>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm card-animate">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                            <p class="font-bold text-gray-800 dark:text-white">#<?= $order['id_order'] ?></p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400"><?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?></p>
+                        </div>
+                        <span class="badge <?= $order['status_order'] == 'selesai' ? 'badge-success' : 'badge-warning' ?>">
+                            <?= $order['status_order'] ?>
+                        </span>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- Recent Orders -->
-<div class="p-4">
-<h3 class="font-bold text-lg mb-3">Recent Orders</h3>
-<div class="space-y-2">
-<?php foreach (array_slice($allOrders, 0, 5) as $order): ?>
-<div class="border rounded-xl p-3 text-sm">
-<div class="flex justify-between">
-<span class="font-bold">#<?= $order['id_order'] ?></span>
-<span class="px-2 py-0.5 rounded-full text-xs <?= $order['status_order'] == 'selesai' ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700' ?>"><?= $order['status_order'] ?></span>
-</div>
-<p class="text-slate-500"><?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?></p>
-</div>
-<?php endforeach; ?>
-</div>
-</div>
-
-<!-- Bottom Nav -->
-<div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto border-t bg-white dark:bg-slate-900 px-4 pb-6 pt-2">
-<div class="flex gap-2">
-<a href="admin.php" class="flex-1 text-center text-primary font-bold py-2">Admin</a>
-<a href="history.php" class="flex-1 text-center text-slate-500 py-2">Orders</a>
-<a href="price.php" class="flex-1 text-center text-slate-500 py-2">Settings</a>
-<a href="profile.php" class="flex-1 text-center text-slate-500 py-2">Profile</a>
-</div>
+<!-- Mobile Bottom Navigation -->
+<div class="bottom-nav md:hidden">
+    <div class="flex justify-around">
+        <a href="admin.php" class="flex flex-col items-center gap-1 text-primary">
+            <span class="material-symbols-outlined">dashboard</span>
+            <span class="text-xs">Home</span>
+        </a>
+        <a href="history.php" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400">
+            <span class="material-symbols-outlined">receipt_long</span>
+            <span class="text-xs">Orders</span>
+        </a>
+        <a href="price.php" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400">
+            <span class="material-symbols-outlined">price_check</span>
+            <span class="text-xs">Price</span>
+        </a>
+        <a href="profile.php" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400">
+            <span class="material-symbols-outlined">person</span>
+            <span class="text-xs">Profile</span>
+        </a>
+    </div>
 </div>
 
 <?= global_route_script() ?>

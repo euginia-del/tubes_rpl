@@ -54,128 +54,129 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email'], $_POST['pass
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>Login - LaundryApp</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css">
 <script>
 tailwind.config = {
     darkMode: "class",
     theme: {
         extend: {
-            colors: {
-                "primary": "#3398db",
-                "background-light": "#f6f7f8",
-                "background-dark": "#121a20",
-            },
-            fontFamily: {
-                "display": ["Inter"]
-            }
+            colors: { "primary": "#6366f1", "secondary": "#8b5cf6" },
+            fontFamily: { "display": ["Inter", "sans-serif"] }
         }
     }
 }
 </script>
-<title>Laundry Service Login</title>
 </head>
-<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
-<div class="relative flex h-auto min-h-screen w-full flex-col bg-background-light dark:bg-background-dark overflow-x-hidden">
-<div class="flex items-center bg-background-light dark:bg-background-dark p-4 pb-2 justify-between">
-<div class="text-primary flex size-12 shrink-0 items-center cursor-pointer">
-<span class="material-symbols-outlined text-3xl">local_laundry_service</span>
-</div>
-<h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight flex-1 text-center">Laundry Portal</h2>
-<button id="themeToggle" class="text-slate-500 dark:text-slate-200 text-xs font-semibold px-2 py-1 rounded-full border border-slate-200 dark:border-slate-700">Mode</button>
+<body class="bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 min-h-screen flex items-center justify-center p-4">
+<div class="container-responsive max-w-6xl mx-auto">
+    <div class="grid md:grid-cols-2 gap-8 items-center">
+        <!-- Left Side - Branding -->
+        <div class="hidden md:block text-center md:text-left fade-in-left">
+            <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-r from-primary to-secondary shadow-xl float-animation mb-6">
+                <span class="material-symbols-outlined text-white text-5xl">local_laundry_service</span>
+            </div>
+            <h1 class="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">LaundryFresh</h1>
+            <p class="text-gray-500 dark:text-gray-400 mt-4 text-lg">Smart Laundry Service</p>
+            <p class="text-gray-400 dark:text-gray-500 mt-6">Fast • Clean • Reliable</p>
+        </div>
+
+        <!-- Right Side - Login Form -->
+        <div class="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 fade-in-right">
+            <div class="text-center mb-6 md:hidden">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-primary to-secondary shadow-lg mb-3">
+                    <span class="material-symbols-outlined text-white text-3xl">local_laundry_service</span>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Welcome Back!</h2>
+            </div>
+            
+            <h2 class="hidden md:block text-2xl font-bold text-gray-800 dark:text-white mb-6">Login to Your Account</h2>
+
+            <?php if ($error = get_flash('error')): ?>
+            <div class="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-3">
+                <p class="text-red-700 dark:text-red-300 text-sm"><?= htmlspecialchars($error) ?></p>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($success = get_flash('success')): ?>
+            <div class="mb-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3">
+                <p class="text-emerald-700 dark:text-emerald-300 text-sm"><?= htmlspecialchars($success) ?></p>
+            </div>
+            <?php endif; ?>
+
+            <form method="post" class="space-y-5">
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Email Address</label>
+                    <div class="relative mt-1">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">mail</span>
+                        <input name="email" type="email" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="your@email.com" required/>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Password</label>
+                    <div class="relative mt-1">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">lock</span>
+                        <input name="password" type="password" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="••••••••" required/>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" class="rounded text-primary focus:ring-primary"/>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Remember me</span>
+                    </label>
+                    <a href="#" onclick="showForgotModal(); return false;" class="text-sm text-primary hover:underline">Forgot Password?</a>
+                </div>
+
+                <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark text-white font-bold py-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2">
+                    <span>Sign In</span>
+                    <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                </button>
+            </form>
+
+            <p class="text-center text-gray-600 dark:text-gray-400 text-sm mt-6">
+                Don't have an account? 
+                <a href="register.php" class="text-primary font-bold hover:underline">Create Account</a>
+            </p>
+        </div>
+    </div>
 </div>
 
-<div class="@container">
-<div class="@[480px]:px-4 @[480px]:py-3 flex justify-center">
-<div class="w-full max-w-[480px] bg-center bg-no-repeat bg-cover flex flex-col items-center justify-center overflow-hidden bg-primary/10 dark:bg-primary/20 @[480px]:rounded-xl min-h-64 relative">
-<div class="bg-white/90 dark:bg-slate-800/90 p-6 rounded-full shadow-lg border-4 border-primary/20">
-<span class="material-symbols-outlined text-primary !text-6xl">local_laundry_service</span>
-</div>
-</div>
-</div>
-</div>
-
-<div class="max-w-[480px] mx-auto w-full">
-<h1 class="text-slate-900 dark:text-slate-100 text-[32px] font-bold leading-tight px-4 text-center pb-2 pt-8">Welcome Back</h1>
-<p class="text-slate-600 dark:text-slate-400 text-base px-4 text-center pb-6">Manage your laundry orders and schedule fresh pickups.</p>
-
-<?php if ($error = get_flash('error')): ?>
-<div class="mx-4 mb-4 rounded-lg bg-red-100 p-3 text-sm font-medium text-red-700 border border-red-200">
-<?= htmlspecialchars($error) ?>
-</div>
-<?php endif; ?>
-
-<?php if ($success = get_flash('success')): ?>
-<div class="mx-4 mb-4 rounded-lg bg-emerald-100 p-3 text-sm font-medium text-emerald-700 border border-emerald-200">
-<?= htmlspecialchars($success) ?>
-</div>
-<?php endif; ?>
-
-<div class="flex flex-col gap-4 px-4 py-3">
-<form method="post" action="">
-<label class="flex flex-col w-full">
-<p class="text-slate-900 dark:text-slate-100 text-sm font-semibold pb-2">Email Address</p>
-<div class="relative">
-<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary/60">mail</span>
-<input name="email" class="w-full rounded-lg border border-primary/20 bg-white dark:bg-slate-800 h-14 pl-12 pr-4 focus:ring-2 focus:ring-primary" placeholder="your@email.com" type="email" required />
-</div>
-</label>
-
-<label class="flex flex-col w-full">
-<p class="text-slate-900 dark:text-slate-100 text-sm font-semibold pb-2">Password</p>
-<div class="relative">
-<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary/60">lock</span>
-<input name="password" class="w-full rounded-lg border border-primary/20 bg-white dark:bg-slate-800 h-14 pl-12 pr-12 focus:ring-2 focus:ring-primary" placeholder="••••••••" type="password" required />
-</div>
-</label>
-
-<div class="flex items-center justify-between py-2">
-<label class="flex items-center gap-2">
-<input class="rounded text-primary" type="checkbox" />
-<span class="text-sm text-slate-600 dark:text-slate-400">Remember me</span>
-</label>
-<a class="text-sm font-semibold text-primary hover:underline" href="#" onclick="showForgotModal(); return false;">Forgot Password?</a>
-</div>
-
-<button type="submit" class="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl shadow-md transition-all mt-4 flex items-center justify-center gap-2">
-<span>Log In</span>
-<span class="material-symbols-outlined">login</span>
-</button>
-</form>
-
-<p class="text-center text-slate-600 dark:text-slate-400 text-sm mt-6">
-Don't have an account? <a class="text-primary font-bold hover:underline" href="register.php">Create Account</a>
-</p>
-</div>
-</div>
-
-<div id="forgotModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
-<div class="bg-white dark:bg-slate-900 rounded-2xl p-8 w-full max-w-md">
-<div class="flex justify-between items-center mb-6">
-<h2 class="text-2xl font-bold">Forgot Password?</h2>
-<button onclick="hideForgotModal()" class="text-2xl">&times;</button>
-</div>
-<form method="POST">
-<input type="hidden" name="forgot_email" value="1">
-<label class="flex flex-col w-full mb-6">
-<p class="text-sm font-semibold mb-2">Email</p>
-<input name="forgot_email" class="w-full rounded-xl border bg-white dark:bg-slate-800 p-3" placeholder="your@email.com" type="email" required>
-</label>
-<div class="flex gap-3">
-<button type="button" onclick="hideForgotModal()" class="flex-1 bg-slate-100 py-3 rounded-xl font-semibold">Cancel</button>
-<button type="submit" class="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Send Link</button>
-</div>
-</form>
-</div>
-</div>
+<!-- Forgot Password Modal -->
+<div id="forgotModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 md:p-8 w-full max-w-md animate-scale-in">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Forgot Password?</h2>
+            <button onclick="hideForgotModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="forgot_email" value="1">
+            <label class="block mb-6">
+                <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Email Address</p>
+                <input name="forgot_email" type="email" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl p-3 bg-gray-50 dark:bg-slate-700" placeholder="your@email.com" required>
+            </label>
+            <div class="flex gap-3">
+                <button type="button" onclick="hideForgotModal()" class="flex-1 bg-gray-100 dark:bg-slate-700 py-3 rounded-xl font-semibold text-gray-700 dark:text-gray-300">Cancel</button>
+                <button type="submit" class="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Send Link</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <script>
-function showForgotModal() { document.getElementById('forgotModal').style.display = 'flex'; }
-function hideForgotModal() { document.getElementById('forgotModal').style.display = 'none'; }
+function showForgotModal() { 
+    document.getElementById('forgotModal').style.display = 'flex'; 
+    document.getElementById('forgotModal').style.opacity = '1';
+}
+function hideForgotModal() { 
+    document.getElementById('forgotModal').style.display = 'none'; 
+}
 </script>
-<?php echo global_route_script(); ?>
+<?= global_route_script() ?>
 </body>
 </html>

@@ -30,82 +30,126 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Order Detail</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>Order Detail - LaundryApp</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css">
 <script>
 tailwind.config = {
     darkMode: "class",
     theme: {
         extend: {
-            colors: {"primary": "#2094f3", "background-light": "#f5f7f8", "background-dark": "#101a22"},
-            fontFamily: {"display": ["Inter"]}
+            colors: { "primary": "#6366f1", "secondary": "#8b5cf6" },
+            fontFamily: { "display": ["Inter", "sans-serif"] }
         }
     }
 }
 </script>
 </head>
-<body class="bg-background-light dark:bg-background-dark font-display">
-<div class="max-w-md mx-auto min-h-screen bg-white dark:bg-slate-900 shadow-xl">
-<div class="flex items-center p-4 border-b">
-<a href="neworder.php" class="text-primary p-2 rounded-full hover:bg-slate-100">
-<span class="material-symbols-outlined">arrow_back</span>
-</a>
-<h2 class="text-lg font-bold flex-1 text-center">Order Detail</h2>
-<button id="themeToggle" class="text-xs px-2 py-1 rounded-full border">Mode</button>
-</div>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 min-h-screen pb-20 md:pb-0">
 
-<form method="post" class="p-4 space-y-6">
-<div class="bg-primary/5 rounded-xl p-4">
-    <p class="text-sm text-slate-500">Layanan yang dipilih</p>
-    <p class="text-xl font-bold"><?= htmlspecialchars($service['nama_layanan']) ?></p>
-    <p class="text-primary font-bold mt-1">Rp <?= number_format($service['harga_per_kg'],0,',','.') ?> / kg</p>
-    <p class="text-sm text-slate-500 mt-2">Estimasi: <?= $service['estimasi_hari'] ?> hari</p>
-</div>
-
-<div>
-    <label class="text-sm font-semibold">Berat Cucian (kg)</label>
-    <div class="relative mt-1">
-        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">fitness_center</span>
-        <input type="number" name="weight" step="0.5" min="0.5" class="w-full border rounded-lg pl-10 pr-3 py-3" value="1" required onchange="updateTotal()">
+<!-- Mobile Header -->
+<div class="md:hidden bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-40">
+    <div class="flex items-center justify-between px-4 py-3">
+        <a href="neworder.php" class="text-gray-600 dark:text-gray-300">
+            <span class="material-symbols-outlined">arrow_back</span>
+        </a>
+        <span class="text-lg font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Order Detail</span>
+        <button id="themeToggle" class="text-xs px-3 py-1 rounded-full border dark:border-slate-600">🌙</button>
     </div>
 </div>
 
-<div>
-    <label class="text-sm font-semibold">Catatan (Opsional)</label>
-    <textarea name="notes" class="w-full border rounded-lg p-3 mt-1" rows="3" placeholder="Contoh: Pakai deterjen mild, jangan dijemur terlalu lama..."></textarea>
-</div>
-
-<div class="bg-slate-100 dark:bg-slate-800 rounded-xl p-4">
-    <div class="flex justify-between">
-        <span>Total Harga</span>
-        <span class="text-xl font-bold text-primary" id="totalDisplay">Rp <?= number_format($service['harga_per_kg'],0,',','.') ?></span>
+<!-- Main Content -->
+<div class="container-responsive py-6 max-w-3xl mx-auto">
+    <!-- Desktop Header -->
+    <div class="hidden md:flex items-center justify-between mb-6">
+        <a href="neworder.php" class="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-primary transition">
+            <span class="material-symbols-outlined">arrow_back</span>
+            <span>Back to Services</span>
+        </a>
+        <button id="themeToggle" class="text-xs px-3 py-1 rounded-full border dark:border-slate-600">🌙</button>
     </div>
-</div>
 
-<button type="submit" class="w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg mt-4">Lanjut ke Jadwal</button>
-</form>
+    <h1 class="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-6">Order Details</h1>
 
-<!-- Bottom Nav -->
-<div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto border-t bg-white dark:bg-slate-900 px-4 pb-6 pt-2">
-<div class="flex gap-2">
-<a href="dashboard.php" class="flex-1 text-center text-slate-500 py-2">Home</a>
-<a href="neworder.php" class="flex-1 text-center text-primary font-bold py-2">New Order</a>
-<a href="history.php" class="flex-1 text-center text-slate-500 py-2">History</a>
-<a href="profile.php" class="flex-1 text-center text-slate-500 py-2">Profile</a>
-</div>
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden">
+        <!-- Service Info -->
+        <div class="bg-gradient-to-r from-primary to-secondary p-6 text-white">
+            <div class="flex items-center gap-4">
+                <div class="w-16 h-16 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
+                    <span class="material-symbols-outlined text-3xl">local_laundry_service</span>
+                </div>
+                <div>
+                    <p class="text-white/80 text-sm">Selected Service</p>
+                    <h2 class="text-2xl font-bold"><?= htmlspecialchars($service['nama_layanan']) ?></h2>
+                    <p class="text-white/80 text-sm mt-1">Estimasi: <?= $service['estimasi_hari'] ?> hari</p>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" class="p-6 space-y-6">
+            <!-- Price Display -->
+            <div class="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Harga per kg</span>
+                    <span class="text-2xl font-bold text-primary">Rp <?= number_format($service['harga_per_kg'],0,',','.') ?></span>
+                </div>
+            </div>
+
+            <!-- Weight Input -->
+            <div>
+                <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-2">
+                    Berat Cucian (kg)
+                </label>
+                <div class="relative">
+                    <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">fitness_center</span>
+                    <input type="number" name="weight" id="weight" step="0.5" min="0.5" 
+                           class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-12 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-transparent" 
+                           value="1" required onchange="updateTotal()">
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Minimal 0.5 kg</p>
+            </div>
+
+            <!-- Notes -->
+            <div>
+                <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-2">
+                    Catatan (Opsional)
+                </label>
+                <textarea name="notes" rows="3" 
+                          class="w-full border border-gray-200 dark:border-slate-600 rounded-xl p-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-transparent" 
+                          placeholder="Contoh: Pakai deterjen mild, pisahkan warna terang dan gelap..."></textarea>
+            </div>
+
+            <!-- Total Price -->
+            <div class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-xl p-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-700 dark:text-gray-300 font-semibold">Total Harga</span>
+                    <span class="text-2xl font-bold text-primary" id="totalDisplay">
+                        Rp <?= number_format($service['harga_per_kg'],0,',','.') ?>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark text-white font-bold py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2">
+                <span>Continue to Schedule</span>
+                <span class="material-symbols-outlined">calendar_month</span>
+            </button>
+        </form>
+    </div>
 </div>
 
 <script>
 function updateTotal() {
-    let weight = document.querySelector('input[name="weight"]').value;
+    let weight = document.getElementById('weight').value;
     let pricePerKg = <?= $service['harga_per_kg'] ?>;
     let total = weight * pricePerKg;
     document.getElementById('totalDisplay').innerHTML = 'Rp ' + total.toLocaleString('id-ID');
 }
 </script>
+
 <?= global_route_script() ?>
 </body>
 </html>
