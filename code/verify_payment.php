@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reject_order_id'])) {
     exit;
 }
 
-// Get ALL pending payments (debug: tampilkan semua)
+// Get pending payments
 $stmt = $db->prepare('
     SELECT p.*, o.id_order, o.tanggal_order, o.harga_snapshot, o.berat_cucian, o.status_order,
            u.nama as customer_name, u.email, u.no_hp,
@@ -49,13 +49,9 @@ $stmt = $db->prepare('
 $stmt->execute();
 $pendingPayments = $stmt->fetchAll();
 
-// Debug: cek jumlah data
-$debugCount = count($pendingPayments);
-
 // Get statistics
 $stats = $db->query('SELECT COUNT(*) as total, SUM(jumlah_bayar) as total_nominal FROM pembayaran WHERE status_bayar = "lunas"')->fetch();
 $pendingCount = $db->query('SELECT COUNT(*) FROM pembayaran WHERE status_bayar = "pending"')->fetchColumn();
-$totalPayments = $db->query('SELECT COUNT(*) FROM pembayaran')->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -158,13 +154,6 @@ tailwind.config = {
     <div class="container-responsive py-6">
         <h1 class="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-6">Verifikasi Pembayaran</h1>
 
-        <!-- Debug Info -->
-        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 mb-4 text-sm">
-            <p>📊 Total Pembayaran di database: <strong><?= $totalPayments ?></strong></p>
-            <p>⏳ Menunggu Verifikasi: <strong><?= $pendingCount ?></strong></p>
-            <p>📋 Data yang ditampilkan: <strong><?= $debugCount ?></strong></p>
-        </div>
-
         <!-- Stats -->
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
             <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg">
@@ -204,19 +193,6 @@ tailwind.config = {
                 <div class="text-center py-12">
                     <span class="material-symbols-outlined text-6xl text-gray-400">check_circle</span>
                     <p class="text-gray-500 dark:text-gray-400 mt-4">Tidak ada pembayaran yang menunggu verifikasi</p>
-                    <p class="text-gray-400 text-sm mt-2">Customer harus melakukan pembayaran terlebih dahulu</p>
-                    <div class="mt-4 p-3 bg-blue-50 rounded-lg text-left text-sm">
-                        <p class="font-semibold">📌 Cara menambah data pembayaran:</p>
-                        <ol class="list-decimal list-inside mt-2 space-y-1">
-                            <li>Login sebagai Customer (michel@gmail.com)</li>
-                            <li>Buat order baru di New Order</li>
-                            <li>Setelah order dibuat, buka detail order</li>
-                            <li>Klik tombol "Bayar Sekarang"</li>
-                            <li>Pilih metode pembayaran (GoPay/DANA/Bank)</li>
-                            <li>Upload bukti pembayaran</li>
-                            <li>Data akan muncul di halaman ini</li>
-                        </ol>
-                    </div>
                 </div>
                 <?php else: ?>
                 <div class="space-y-4">

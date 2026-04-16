@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['konfirmasi'])) {
             
             // CATAT TRANSAKSI SALDO
             $stmt = $db->prepare('INSERT INTO transaksi_saldo (id_user, id_order, nominal, jenis, status, keterangan, tanggal) VALUES (?, ?, ?, "pembayaran", "sukses", ?, NOW())');
-            $stmt->execute([$user['id_user'], $order_id, $order['harga_snapshot'], 'Pembayaran order #' . $order_id]);
+            $stmt->execute([$user['id_user'], $order_id, $order['harga_snapshot'], 'Pembayaran order #' . $order_id . ' via Saldo']);
             
             // UPDATE STATUS ORDER LANGSUNG KE PROSES
             update_order_status($order_id, 'proses');
@@ -67,12 +67,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['konfirmasi'])) {
         if (isset($_FILES['bukti_pembayaran']) && $_FILES['bukti_pembayaran']['error'] === UPLOAD_ERR_OK) {
             $upload_dir = 'uploads/bukti_pembayaran/';
             if (!file_exists($upload_dir)) mkdir($upload_dir, 0777, true);
-            $bukti_pembayaran = $upload_dir . 'bukti_' . $order_id . '_' . time() . '.' . pathinfo($_FILES['bukti_pembayaran']['name'], PATHINFO_EXTENSION);
+            $ekstensi = pathinfo($_FILES['bukti_pembayaran']['name'], PATHINFO_EXTENSION);
+            $bukti_pembayaran = $upload_dir . 'bukti_' . $order_id . '_' . time() . '.' . $ekstensi;
             move_uploaded_file($_FILES['bukti_pembayaran']['tmp_name'], $bukti_pembayaran);
         }
         
         $catatan = $_POST['catatan'] ?? '';
         
+        // SIMPAN KE PEMBAYARAN
         $stmt = $db->prepare('INSERT INTO pembayaran (id_order, metode, nomor_transaksi, tanggal_pembayaran, jumlah_bayar, status_bayar, bukti_pembayaran, catatan_pembayaran) VALUES (?, ?, ?, NOW(), ?, "pending", ?, ?)');
         $stmt->execute([$order_id, $metode, $nomor_transaksi, $order['harga_snapshot'], $bukti_pembayaran, $catatan]);
         
@@ -83,14 +85,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['konfirmasi'])) {
 }
 
 $methods = [
-    'saldo' => ['name' => 'Bayar Pakai Saldo', 'icon' => 'account_balance_wallet', 'color' => 'from-primary to-secondary', 'need_upload' => false, 'desc' => 'Langsung dipotong dari saldo Anda'],
-    'gopay' => ['name' => 'GoPay', 'icon' => 'account_balance_wallet', 'color' => 'from-green-500 to-green-600', 'need_upload' => true, 'desc' => 'Scan QRIS atau transfer ke nomor GoPay 081234567890'],
-    'dana' => ['name' => 'DANA', 'icon' => 'account_balance_wallet', 'color' => 'from-blue-500 to-blue-600', 'need_upload' => true, 'desc' => 'Scan QRIS atau transfer ke nomor DANA 081234567890'],
-    'bca' => ['name' => 'BCA Transfer', 'icon' => 'account_balance', 'color' => 'from-red-500 to-red-600', 'need_upload' => true, 'desc' => 'Transfer ke BCA a.n LaundryFresh - No. Rek: 1234567890'],
-    'bri' => ['name' => 'BRI Transfer', 'icon' => 'account_balance', 'color' => 'from-blue-700 to-blue-800', 'need_upload' => true, 'desc' => 'Transfer ke BRI a.n LaundryFresh - No. Rek: 1234567890'],
-    'mandiri' => ['name' => 'Mandiri Transfer', 'icon' => 'account_balance', 'color' => 'from-yellow-600 to-yellow-700', 'need_upload' => true, 'desc' => 'Transfer ke Mandiri a.n LaundryFresh - No. Rek: 1234567890'],
-    'bni' => ['name' => 'BNI Transfer', 'icon' => 'account_balance', 'color' => 'from-blue-600 to-blue-700', 'need_upload' => true, 'desc' => 'Transfer ke BNI a.n LaundryFresh - No. Rek: 1234567890'],
-    'tunai' => ['name' => 'Tunai (Bayar di Tempat)', 'icon' => 'payments', 'color' => 'from-gray-500 to-gray-600', 'need_upload' => false, 'desc' => 'Bayar langsung saat mengambil laundry']
+    'saldo' => ['name' => 'Bayar Pakai Saldo', 'icon' => 'account_balance_wallet', 'color' => 'from-primary to-secondary', 'need_upload' => false, 'desc' => 'Langsung dipotong dari saldo Anda', 'rekening' => ''],
+    'gopay' => ['name' => 'GoPay', 'icon' => 'account_balance_wallet', 'color' => 'from-green-500 to-green-600', 'need_upload' => true, 'desc' => 'Scan QRIS atau transfer ke nomor GoPay', 'rekening' => '081234567890'],
+    'dana' => ['name' => 'DANA', 'icon' => 'account_balance_wallet', 'color' => 'from-blue-500 to-blue-600', 'need_upload' => true, 'desc' => 'Scan QRIS atau transfer ke nomor DANA', 'rekening' => '081234567890'],
+    'bca' => ['name' => 'BCA Transfer', 'icon' => 'account_balance', 'color' => 'from-red-500 to-red-600', 'need_upload' => true, 'desc' => 'Transfer ke rekening BCA', 'rekening' => '1234567890 a.n LaundryFresh'],
+    'bri' => ['name' => 'BRI Transfer', 'icon' => 'account_balance', 'color' => 'from-blue-700 to-blue-800', 'need_upload' => true, 'desc' => 'Transfer ke rekening BRI', 'rekening' => '1234567890 a.n LaundryFresh'],
+    'mandiri' => ['name' => 'Mandiri Transfer', 'icon' => 'account_balance', 'color' => 'from-yellow-600 to-yellow-700', 'need_upload' => true, 'desc' => 'Transfer ke rekening Mandiri', 'rekening' => '1234567890 a.n LaundryFresh'],
+    'bni' => ['name' => 'BNI Transfer', 'icon' => 'account_balance', 'color' => 'from-blue-600 to-blue-700', 'need_upload' => true, 'desc' => 'Transfer ke rekening BNI', 'rekening' => '1234567890 a.n LaundryFresh'],
+    'tunai' => ['name' => 'Tunai (Bayar di Tempat)', 'icon' => 'payments', 'color' => 'from-gray-500 to-gray-600', 'need_upload' => false, 'desc' => 'Bayar langsung saat mengambil laundry', 'rekening' => '']
 ];
 
 $selected_method = $_GET['method'] ?? null;
@@ -121,7 +123,6 @@ tailwind.config = {
 function selectMethod(method) {
     window.location.href = 'payment.php?order_id=<?= $order_id ?>&method=' + method;
 }
-
 function goBack() {
     window.location.href = 'payment.php?order_id=<?= $order_id ?>';
 }
@@ -234,8 +235,7 @@ function goBack() {
                 <div class="space-y-3">
                     <p class="text-gray-600 dark:text-gray-300">🔹 Transfer ke rekening berikut:</p>
                     <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border">
-                        <p class="font-mono text-lg font-bold text-primary"><?= $selected_method === 'gopay' ? '081234567890' : ($selected_method === 'dana' ? '081234567890' : '1234567890') ?></p>
-                        <p class="text-sm text-gray-500">a.n LaundryFresh</p>
+                        <p class="font-mono text-lg font-bold text-primary"><?= $selected_method_data['rekening'] ?></p>
                     </div>
                     <p class="text-gray-600 dark:text-gray-300 mt-3">🔹 Nominal: <strong class="text-primary text-lg">Rp <?= number_format($order['harga_snapshot'], 0, ',', '.') ?></strong></p>
                     <p class="text-gray-600 dark:text-gray-300">🔹 Nomor Transaksi: <strong class="text-primary"><?= $nomor_transaksi ?></strong></p>
@@ -258,7 +258,7 @@ function goBack() {
                 
                 <div>
                     <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Catatan (Opsional)</label>
-                    <textarea name="catatan" rows="2" class="w-full border rounded-xl p-3 mt-1 dark:bg-slate-700" placeholder="Contoh: Transfer dari BCA a.n Budi"></textarea>
+                    <textarea name="catatan" rows="2" class="w-full border rounded-xl p-3 mt-1 dark:bg-slate-700" placeholder="Contoh: Transfer dari BCA a.n Budi, No. Transaksi: ..."></textarea>
                 </div>
                 
                 <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary text-white font-bold py-3 rounded-xl hover-lift transition">
