@@ -4,6 +4,11 @@ require_supervisor();
 
 $db = get_db();
 
+// Ambil parameter filter
+$filter_customer = $_GET['customer'] ?? 'all';
+$filter_status = $_GET['status'] ?? 'all';
+$filter_date = $_GET['date'] ?? 'all';
+
 // Get statistics for overview
 $totalOrders = get_order_count($db);
 $completedOrders = get_completed_orders_count($db);
@@ -24,20 +29,53 @@ $stmt = $db->prepare('
 $stmt->execute();
 $monthlyData = $stmt->fetchAll();
 
-// Get recent orders from ALL customers
-$stmt = $db->query('
+// Build query untuk recent orders dengan filter
+$sql = '
     SELECT o.*, u.nama as customer_name, l.nama_layanan as service_name
     FROM orders o
     JOIN user u ON o.id_user = u.id_user
     JOIN layanan l ON o.id_layanan = l.id_layanan
-    ORDER BY o.tanggal_order DESC
-    LIMIT 10
-');
+    WHERE 1=1
+';
+
+$params = [];
+
+// Filter by customer
+if ($filter_customer !== 'all') {
+    $sql .= ' AND u.id_user = ?';
+    $params[] = $filter_customer;
+}
+
+// Filter by status
+if ($filter_status !== 'all') {
+    $sql .= ' AND o.status_order = ?';
+    $params[] = $filter_status;
+}
+
+// Filter by date
+if ($filter_date === 'today') {
+    $sql .= ' AND DATE(o.tanggal_order) = CURDATE()';
+} elseif ($filter_date === 'week') {
+    $sql .= ' AND YEARWEEK(o.tanggal_order) = YEARWEEK(CURDATE())';
+} elseif ($filter_date === 'month') {
+    $sql .= ' AND MONTH(o.tanggal_order) = MONTH(CURDATE()) AND YEAR(o.tanggal_order) = YEAR(CURDATE())';
+}
+
+$sql .= ' ORDER BY o.tanggal_order DESC LIMIT 50';
+$stmt = $db->prepare($sql);
+$stmt->execute($params);
 $recentOrders = $stmt->fetchAll();
 
-// Get all customers list
-$stmt = $db->query('SELECT id_user, nama, email FROM user WHERE role = "customer" ORDER BY id_user DESC');
+// Get all customers list for filter
+$stmt = $db->query('SELECT id_user, nama, email FROM user WHERE role = "customer" ORDER BY nama ASC');
 $allCustomers = $stmt->fetchAll();
+
+// Get status counts for filter badges
+$statusCounts = [
+    'pending' => get_pending_orders_count($db),
+    'proses' => get_processed_orders_count($db),
+    'selesai' => get_completed_orders_count($db)
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -59,6 +97,18 @@ tailwind.config = {
             fontFamily: { "display": ["Inter", "sans-serif"] }
         }
     }
+}
+</script>
+<script>
+function applyFilter() {
+    var customer = document.getElementById('filter_customer').value;
+    var status = document.getElementById('filter_status').value;
+    var date = document.getElementById('filter_date').value;
+    window.location.href = 'supervisor.php?customer=' + customer + '&status=' + status + '&date=' + date;
+}
+
+function resetFilter() {
+    window.location.href = 'supervisor.php';
 }
 </script>
 </head>
@@ -146,11 +196,77 @@ tailwind.config = {
             <canvas id="revenueChart" height="200"></canvas>
         </div>
 
-        <!-- Recent Orders Table (SEMUA CUSTOMER) -->
+        <!-- Filter Section -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg mb-6">
+            <h3 class="text-md font-semibold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">filter_list</span>
+                Filter Orders
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Customer</label>
+                    <select id="filter_customer" onchange="applyFilter()" class="w-full border rounded-lg p-2 mt-1 dark:bg-slate-700">
+                        <option value="all" <?= $filter_customer == 'all' ? 'selected' : '' ?>>Semua Customer</option>
+                        <?php foreach($allCustomers as $customer): ?>
+                        <option value="<?= $customer['id_user'] ?>" <?= $filter_customer == $customer['id_user'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($customer['nama']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                    <select id="filter_status" onchange="applyFilter()" class="w-full border rounded-lg p-2 mt-1 dark:bg-slate-700">
+                        <option value="all" <?= $filter_status == 'all' ? 'selected' : '' ?>>Semua Status</option>
+                        <option value="pending" <?= $filter_status == 'pending' ? 'selected' : '' ?>>Pending (<?= $statusCounts['pending'] ?>)</option>
+                        <option value="proses" <?= $filter_status == 'proses' ? 'selected' : '' ?>>Proses (<?= $statusCounts['proses'] ?>)</option>
+                        <option value="selesai" <?= $filter_status == 'selesai' ? 'selected' : '' ?>>Selesai (<?= $statusCounts['selesai'] ?>)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Periode</label>
+                    <select id="filter_date" onchange="applyFilter()" class="w-full border rounded-lg p-2 mt-1 dark:bg-slate-700">
+                        <option value="all" <?= $filter_date == 'all' ? 'selected' : '' ?>>Semua Waktu</option>
+                        <option value="today" <?= $filter_date == 'today' ? 'selected' : '' ?>>Hari Ini</option>
+                        <option value="week" <?= $filter_date == 'week' ? 'selected' : '' ?>>Minggu Ini</option>
+                        <option value="month" <?= $filter_date == 'month' ? 'selected' : '' ?>>Bulan Ini</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button onclick="resetFilter()" class="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition">
+                        Reset Filter
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Orders Table -->
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden mb-8">
-            <div class="px-6 py-4 border-b dark:border-slate-700 bg-cyan-50 dark:bg-cyan-900/20">
-                <h2 class="text-lg font-bold text-cyan-800 dark:text-cyan-300">Recent Orders (Semua Customer)</h2>
-                <p class="text-sm text-cyan-600">10 order terakhir dari semua customer</p>
+            <div class="px-6 py-4 border-b dark:border-slate-700 bg-cyan-50 dark:bg-cyan-900/20 flex justify-between items-center">
+                <div>
+                    <h2 class="text-lg font-bold text-cyan-800 dark:text-cyan-300">Recent Orders</h2>
+                    <p class="text-sm text-cyan-600">Menampilkan <?= count($recentOrders) ?> order</p>
+                </div>
+                <div class="text-sm text-gray-500">
+                    <?php if ($filter_customer != 'all'): ?>
+                    <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                        Customer: <?php 
+                            $cust = array_filter($allCustomers, fn($c) => $c['id_user'] == $filter_customer);
+                            echo htmlspecialchars(reset($cust)['nama'] ?? '');
+                        ?>
+                    </span>
+                    <?php endif; ?>
+                    <?php if ($filter_status != 'all'): ?>
+                    <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded-full text-xs">
+                        Status: <?= $filter_status ?>
+                    </span>
+                    <?php endif; ?>
+                    <?php if ($filter_date != 'all'): ?>
+                    <span class="inline-flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                        Periode: <?= $filter_date == 'today' ? 'Hari Ini' : ($filter_date == 'week' ? 'Minggu Ini' : 'Bulan Ini') ?>
+                    </span>
+                    <?php endif; ?>
+                </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -166,30 +282,34 @@ tailwind.config = {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach($recentOrders as $order): ?>
-                        <tr class="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                            <td class="px-4 py-3 font-medium">#<?= $order['id_order'] ?></td>
-                            <td class="px-4 py-3">
-                                <span class="flex items-center gap-2">
-                                    <span class="material-symbols-outlined text-sm text-gray-400">person</span>
-                                    <?= htmlspecialchars($order['customer_name']) ?>
-                                </span>
-                            </td>
-                            <td class="px-4 py-3"><?= htmlspecialchars($order['service_name']) ?></td>
-                            <td class="px-4 py-3 text-center"><?= $order['berat_cucian'] ?> kg</td>
-                            <td class="px-4 py-3 text-right font-semibold">Rp <?= number_format($order['harga_snapshot'],0,',','.') ?></td>
-                            <td class="px-4 py-3 text-center">
-                                <span class="badge <?= $order['status_order'] == 'selesai' ? 'badge-success' : ($order['status_order'] == 'proses' ? 'badge-info' : 'badge-warning') ?>">
-                                    <?= $order['status_order'] ?>
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-center text-sm"><?= date('d/m/Y', strtotime($order['tanggal_order'])) ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                        <?php if(empty($recentOrders)): ?>
+                        <?php if (empty($recentOrders)): ?>
                         <tr>
-                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">Belum ada order</td>
+                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                                <span class="material-symbols-outlined text-4xl">inbox</span>
+                                <p class="mt-2">Tidak ada order yang sesuai dengan filter</p>
+                            </td>
                         </tr>
+                        <?php else: ?>
+                            <?php foreach($recentOrders as $order): ?>
+                            <tr class="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                                <td class="px-4 py-3 font-medium">#<?= $order['id_order'] ?></td>
+                                <td class="px-4 py-3">
+                                    <span class="flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-sm text-gray-400">person</span>
+                                        <?= htmlspecialchars($order['customer_name']) ?>
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3"><?= htmlspecialchars($order['service_name']) ?> </td>
+                                <td class="px-4 py-3 text-center"><?= $order['berat_cucian'] ?> kg</td>
+                                <td class="px-4 py-3 text-right font-semibold">Rp <?= number_format($order['harga_snapshot'],0,',','.') ?></td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="badge <?= $order['status_order'] == 'selesai' ? 'badge-success' : ($order['status_order'] == 'proses' ? 'badge-info' : 'badge-warning') ?>">
+                                        <?= $order['status_order'] ?>
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-center text-sm"><?= date('d/m/Y', strtotime($order['tanggal_order'])) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -200,7 +320,7 @@ tailwind.config = {
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden">
             <div class="px-6 py-4 border-b dark:border-slate-700">
                 <h2 class="text-lg font-bold text-gray-800 dark:text-white">Daftar Customer</h2>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Semua customer yang terdaftar</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Semua customer yang terdaftar (<?= count($allCustomers) ?> customer)</p>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -209,12 +329,19 @@ tailwind.config = {
                             <th class="px-4 py-3 text-left">ID</th>
                             <th class="px-4 py-3 text-left">Nama Customer</th>
                             <th class="px-4 py-3 text-left">Email</th>
+                            <th class="px-4 py-3 text-center">Total Orders</th>
+                            <th class="px-4 py-3 text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach($allCustomers as $customer): ?>
+                        <?php foreach($allCustomers as $customer): 
+                            // Hitung total order customer ini
+                            $stmt = $db->prepare('SELECT COUNT(*) FROM orders WHERE id_user = ?');
+                            $stmt->execute([$customer['id_user']]);
+                            $totalOrderCustomer = $stmt->fetchColumn();
+                        ?>
                         <tr class="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                            <td class="px-4 py-3">#<?= $customer['id_user'] ?></td>
+                            <td class="px-4 py-3">#<?= $customer['id_user'] ?> </td>
                             <td class="px-4 py-3">
                                 <span class="flex items-center gap-2">
                                     <span class="material-symbols-outlined text-sm text-gray-400">person</span>
@@ -222,11 +349,19 @@ tailwind.config = {
                                 </span>
                             </td>
                             <td class="px-4 py-3"><?= htmlspecialchars($customer['email']) ?></td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="badge badge-info"><?= $totalOrderCustomer ?> orders</span>
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <a href="supervisor.php?customer=<?= $customer['id_user'] ?>" class="text-primary text-sm hover:underline">
+                                    Lihat Orders →
+                                </a>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                         <?php if(empty($allCustomers)): ?>
                         <tr>
-                            <td colspan="3" class="px-4 py-8 text-center text-gray-500">Belum ada customer terdaftar</td>
+                            <td colspan="5" class="px-4 py-8 text-center text-gray-500">Belum ada customer terdaftar</td>
                         </tr>
                         <?php endif; ?>
                     </tbody>
