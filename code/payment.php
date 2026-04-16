@@ -28,10 +28,12 @@ $stmt = $db->prepare('SELECT saldo FROM user WHERE id_user = ?');
 $stmt->execute([$user['id_user']]);
 $saldo = $stmt->fetchColumn();
 
-// Handle payment
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['metode'])) {
+// Generate nomor transaksi unik
+$nomor_transaksi = 'TRX' . date('YmdHis') . rand(100, 999);
+
+// Handle payment confirmation
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['konfirmasi'])) {
     $metode = $_POST['metode'];
-    $nomor_transaksi = 'TRX' . date('YmdHis') . rand(100, 999);
     
     if ($metode === 'saldo') {
         // CEK SALDO
@@ -81,15 +83,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['metode'])) {
 }
 
 $methods = [
-    'saldo' => ['name' => 'Bayar Pakai Saldo', 'icon' => 'account_balance_wallet', 'color' => 'from-primary to-secondary', 'need_upload' => false],
-    'gopay' => ['name' => 'GoPay', 'icon' => 'account_balance_wallet', 'color' => 'from-green-500 to-green-600', 'need_upload' => true],
-    'dana' => ['name' => 'DANA', 'icon' => 'account_balance_wallet', 'color' => 'from-blue-500 to-blue-600', 'need_upload' => true],
-    'bca' => ['name' => 'BCA Transfer', 'icon' => 'account_balance', 'color' => 'from-red-500 to-red-600', 'need_upload' => true],
-    'bri' => ['name' => 'BRI Transfer', 'icon' => 'account_balance', 'color' => 'from-blue-700 to-blue-800', 'need_upload' => true],
-    'mandiri' => ['name' => 'Mandiri Transfer', 'icon' => 'account_balance', 'color' => 'from-yellow-600 to-yellow-700', 'need_upload' => true],
-    'bni' => ['name' => 'BNI Transfer', 'icon' => 'account_balance', 'color' => 'from-blue-600 to-blue-700', 'need_upload' => true],
-    'tunai' => ['name' => 'Tunai (Bayar di Tempat)', 'icon' => 'payments', 'color' => 'from-gray-500 to-gray-600', 'need_upload' => false]
+    'saldo' => ['name' => 'Bayar Pakai Saldo', 'icon' => 'account_balance_wallet', 'color' => 'from-primary to-secondary', 'need_upload' => false, 'desc' => 'Langsung dipotong dari saldo Anda'],
+    'gopay' => ['name' => 'GoPay', 'icon' => 'account_balance_wallet', 'color' => 'from-green-500 to-green-600', 'need_upload' => true, 'desc' => 'Scan QRIS atau transfer ke nomor GoPay 081234567890'],
+    'dana' => ['name' => 'DANA', 'icon' => 'account_balance_wallet', 'color' => 'from-blue-500 to-blue-600', 'need_upload' => true, 'desc' => 'Scan QRIS atau transfer ke nomor DANA 081234567890'],
+    'bca' => ['name' => 'BCA Transfer', 'icon' => 'account_balance', 'color' => 'from-red-500 to-red-600', 'need_upload' => true, 'desc' => 'Transfer ke BCA a.n LaundryFresh - No. Rek: 1234567890'],
+    'bri' => ['name' => 'BRI Transfer', 'icon' => 'account_balance', 'color' => 'from-blue-700 to-blue-800', 'need_upload' => true, 'desc' => 'Transfer ke BRI a.n LaundryFresh - No. Rek: 1234567890'],
+    'mandiri' => ['name' => 'Mandiri Transfer', 'icon' => 'account_balance', 'color' => 'from-yellow-600 to-yellow-700', 'need_upload' => true, 'desc' => 'Transfer ke Mandiri a.n LaundryFresh - No. Rek: 1234567890'],
+    'bni' => ['name' => 'BNI Transfer', 'icon' => 'account_balance', 'color' => 'from-blue-600 to-blue-700', 'need_upload' => true, 'desc' => 'Transfer ke BNI a.n LaundryFresh - No. Rek: 1234567890'],
+    'tunai' => ['name' => 'Tunai (Bayar di Tempat)', 'icon' => 'payments', 'color' => 'from-gray-500 to-gray-600', 'need_upload' => false, 'desc' => 'Bayar langsung saat mengambil laundry']
 ];
+
+$selected_method = $_GET['method'] ?? null;
+$selected_method_data = $selected_method ? $methods[$selected_method] : null;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -113,17 +118,12 @@ tailwind.config = {
 }
 </script>
 <script>
-let selectedMethod = '';
-function showUploadForm(method, needUpload) {
-    selectedMethod = method;
-    if (needUpload) {
-        document.getElementById('uploadForm').style.display = 'block';
-        document.getElementById('selectedMethodName').innerText = method.toUpperCase();
-        document.getElementById('selectedMethod').value = method;
-    } else {
-        document.getElementById('selectedMethod').value = method;
-        document.getElementById('paymentForm').submit();
-    }
+function selectMethod(method) {
+    window.location.href = 'payment.php?order_id=<?= $order_id ?>&method=' + method;
+}
+
+function goBack() {
+    window.location.href = 'payment.php?order_id=<?= $order_id ?>';
 }
 </script>
 </head>
@@ -185,74 +185,123 @@ function showUploadForm(method, needUpload) {
             </div>
             <a href="topup.php" class="text-sm bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600 transition">Top Up Saldo</a>
         </div>
-        <?php if ($saldo >= $order['harga_snapshot']): ?>
-        <p class="text-xs text-green-600 mt-2">✅ Saldo cukup! Anda bisa bayar pakai saldo.</p>
-        <?php else: ?>
-        <p class="text-xs text-red-500 mt-2">⚠️ Saldo tidak cukup. Butuh Rp <?= number_format($order['harga_snapshot'] - $saldo, 0, ',', '.') ?> lagi.</p>
-        <?php endif; ?>
     </div>
 
-    <!-- Form Utama -->
-    <form id="paymentForm" method="post" enctype="multipart/form-data">
-        <input type="hidden" name="metode" id="selectedMethod">
+    <?php if (!$selected_method): ?>
+    <!-- Pilih Metode -->
+    <div class="grid gap-4">
+        <?php foreach($methods as $key => $method): ?>
+        <button onclick="selectMethod('<?= $key ?>')" 
+            class="w-full bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md hover:shadow-lg transition-all hover-lift flex items-center gap-4 text-left"
+            <?= ($key === 'saldo' && $saldo < $order['harga_snapshot']) ? 'disabled style="opacity:0.5"' : '' ?>>
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-r <?= $method['color'] ?> flex items-center justify-center">
+                <span class="material-symbols-outlined text-white text-2xl"><?= $method['icon'] ?></span>
+            </div>
+            <div class="flex-1">
+                <h3 class="font-bold text-gray-800 dark:text-white"><?= $method['name'] ?></h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400"><?= $method['desc'] ?></p>
+            </div>
+            <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+        </button>
+        <?php endforeach; ?>
+    </div>
+    <?php else: ?>
+    <!-- Detail Pembayaran & Konfirmasi -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden">
+        <div class="bg-gradient-to-r <?= $selected_method_data['color'] ?> p-4 text-white">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-2xl"><?= $selected_method_data['icon'] ?></span>
+                <h2 class="text-xl font-bold"><?= $selected_method_data['name'] ?></h2>
+            </div>
+        </div>
         
-        <!-- Payment Methods -->
-        <div class="grid gap-4 mb-6">
-            <?php foreach($methods as $key => $method): ?>
-            <button type="button" onclick="showUploadForm('<?= $key ?>', <?= $method['need_upload'] ? 'true' : 'false' ?>)" 
-                class="w-full bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md hover:shadow-lg transition-all hover-lift flex items-center gap-4 text-left"
-                <?= ($key === 'saldo' && $saldo < $order['harga_snapshot']) ? 'disabled style="opacity:0.5"' : '' ?>>
-                <div class="w-12 h-12 rounded-xl bg-gradient-to-r <?= $method['color'] ?> flex items-center justify-center">
-                    <span class="material-symbols-outlined text-white text-2xl"><?= $method['icon'] ?></span>
+        <div class="p-6">
+            <!-- Informasi Pembayaran -->
+            <div class="mb-6 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl">
+                <h3 class="font-semibold text-gray-800 dark:text-white mb-3">Informasi Pembayaran</h3>
+                
+                <?php if ($selected_method === 'saldo'): ?>
+                <div class="space-y-2">
+                    <p class="text-gray-600 dark:text-gray-300">🔹 Anda akan membayar <strong>Rp <?= number_format($order['harga_snapshot'], 0, ',', '.') ?></strong> menggunakan saldo</p>
+                    <p class="text-gray-600 dark:text-gray-300">🔹 Saldo Anda saat ini: <strong class="<?= $saldo >= $order['harga_snapshot'] ? 'text-emerald-600' : 'text-red-600' ?>">Rp <?= number_format($saldo, 0, ',', '.') ?></strong></p>
+                    <?php if ($saldo >= $order['harga_snapshot']): ?>
+                    <p class="text-emerald-600 text-sm">✅ Saldo cukup! Sisa saldo setelah pembayaran: Rp <?= number_format($saldo - $order['harga_snapshot'], 0, ',', '.') ?></p>
+                    <?php else: ?>
+                    <p class="text-red-600 text-sm">❌ Saldo tidak cukup! Butuh tambahan Rp <?= number_format($order['harga_snapshot'] - $saldo, 0, ',', '.') ?></p>
+                    <?php endif; ?>
                 </div>
-                <div class="flex-1">
-                    <h3 class="font-bold text-gray-800 dark:text-white"><?= $method['name'] ?></h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                        <?php if ($key === 'saldo'): ?>
-                            <?= $saldo >= $order['harga_snapshot'] ? 'Saldo cukup untuk membayar' : 'Saldo tidak cukup' ?>
-                        <?php else: ?>
-                            <?= $key === 'tunai' ? 'Bayar langsung saat mengambil laundry' : 'Transfer via ' . $method['name'] ?>
-                        <?php endif; ?>
+                <?php else: ?>
+                <div class="space-y-3">
+                    <p class="text-gray-600 dark:text-gray-300">🔹 Transfer ke rekening berikut:</p>
+                    <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border">
+                        <p class="font-mono text-lg font-bold text-primary"><?= $selected_method === 'gopay' ? '081234567890' : ($selected_method === 'dana' ? '081234567890' : '1234567890') ?></p>
+                        <p class="text-sm text-gray-500">a.n LaundryFresh</p>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-300 mt-3">🔹 Nominal: <strong class="text-primary text-lg">Rp <?= number_format($order['harga_snapshot'], 0, ',', '.') ?></strong></p>
+                    <p class="text-gray-600 dark:text-gray-300">🔹 Nomor Transaksi: <strong class="text-primary"><?= $nomor_transaksi ?></strong></p>
+                    <p class="text-sm text-gray-500 mt-2">*Simpan nomor transaksi ini untuk konfirmasi pembayaran</p>
+                </div>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Form Upload Bukti (untuk non-saldo) -->
+            <?php if ($selected_method !== 'saldo'): ?>
+            <form method="post" enctype="multipart/form-data" class="space-y-4">
+                <input type="hidden" name="metode" value="<?= $selected_method ?>">
+                <input type="hidden" name="konfirmasi" value="1">
+                
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Upload Bukti Transfer</label>
+                    <input type="file" name="bukti_pembayaran" accept="image/*,.pdf" class="w-full border rounded-xl p-2 mt-1 dark:bg-slate-700" required>
+                    <p class="text-xs text-gray-400 mt-1">Format: JPG, PNG, PDF (Max 2MB)</p>
+                </div>
+                
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Catatan (Opsional)</label>
+                    <textarea name="catatan" rows="2" class="w-full border rounded-xl p-3 mt-1 dark:bg-slate-700" placeholder="Contoh: Transfer dari BCA a.n Budi"></textarea>
+                </div>
+                
+                <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary text-white font-bold py-3 rounded-xl hover-lift transition">
+                    Konfirmasi Pembayaran
+                </button>
+            </form>
+            <?php else: ?>
+            <!-- Form untuk bayar pakai saldo -->
+            <form method="post" class="space-y-4">
+                <input type="hidden" name="metode" value="saldo">
+                <input type="hidden" name="konfirmasi" value="1">
+                
+                <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-xl">
+                    <p class="text-yellow-800 dark:text-yellow-300 text-sm">
+                        ⚠️ Konfirmasi pembayaran akan memotong saldo Anda sebesar <strong>Rp <?= number_format($order['harga_snapshot'], 0, ',', '.') ?></strong>
                     </p>
                 </div>
-                <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+                
+                <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary text-white font-bold py-3 rounded-xl hover-lift transition" <?= $saldo < $order['harga_snapshot'] ? 'disabled' : '' ?>>
+                    Konfirmasi Pembayaran dengan Saldo
+                </button>
+            </form>
+            <?php endif; ?>
+            
+            <button onclick="goBack()" class="w-full mt-3 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 font-semibold py-3 rounded-xl transition">
+                Kembali Pilih Metode
             </button>
-            <?php endforeach; ?>
         </div>
-
-        <!-- Upload Form -->
-        <div id="uploadForm" style="display: none;" class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
-            <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4">Upload Bukti Pembayaran</h3>
-            <p class="text-sm text-gray-500 mb-4">Silakan upload bukti transfer untuk metode <strong id="selectedMethodName">-</strong></p>
-            
-            <div class="mb-4">
-                <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Upload Bukti Transfer (Foto/SS)</label>
-                <input type="file" name="bukti_pembayaran" accept="image/*,.pdf" class="w-full border rounded-xl p-2 mt-1 dark:bg-slate-700" required>
-                <p class="text-xs text-gray-400 mt-1">Format: JPG, PNG, PDF (Max 2MB)</p>
-            </div>
-            
-            <div class="mb-4">
-                <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Catatan (Opsional)</label>
-                <textarea name="catatan" rows="2" class="w-full border rounded-xl p-3 mt-1 dark:bg-slate-700" placeholder="Contoh: Transfer dari BCA an. Budi"></textarea>
-            </div>
-            
-            <div class="flex gap-3">
-                <button type="button" onclick="document.getElementById('uploadForm').style.display='none'" class="flex-1 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 py-2 rounded-xl font-semibold">Batal</button>
-                <button type="submit" class="flex-1 bg-primary text-white py-2 rounded-xl font-semibold hover:bg-primary-dark transition">Kirim Bukti</button>
-            </div>
-        </div>
-    </form>
+    </div>
+    <?php endif; ?>
 
     <!-- Info -->
     <div class="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl">
         <div class="flex items-start gap-3">
             <span class="material-symbols-outlined text-yellow-600">info</span>
             <div>
-                <p class="text-sm font-semibold text-yellow-800 dark:text-yellow-300">Informasi Pembayaran</p>
+                <p class="text-sm font-semibold text-yellow-800 dark:text-yellow-300">Cara Pembayaran</p>
                 <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                    ✅ <strong>Bayar Pakai Saldo</strong> → Langsung diproses, saldo berkurang<br>
-                    📤 <strong>GoPay/DANA/Transfer Bank</strong> → Upload bukti, dapat No. Transaksi<br>
-                    💰 <strong>Tunai</strong> → Bayar saat mengambil laundry
+                    1. Pilih metode pembayaran<br>
+                    2. Ikuti instruksi pembayaran<br>
+                    3. Upload bukti transfer (jika diperlukan)<br>
+                    4. Klik Konfirmasi Pembayaran<br>
+                    5. Order akan diproses setelah diverifikasi admin
                 </p>
             </div>
         </div>
