@@ -15,45 +15,52 @@ $db = get_db();
 $role = $user['role'];
 $userId = $user['id_user'];
 
-// ========== MY ORDER STATISTICS (ORDER MILIK USER INI) ==========
-$stmt = $db->prepare('SELECT * FROM orders WHERE id_user = ? ORDER BY tanggal_order DESC');
-$stmt->execute([$userId]);
-$myOrders = $stmt->fetchAll();
-
-$myTotalOrders = count($myOrders);
+// ========== MY ORDER STATISTICS (HANYA UNTUK CUSTOMER) ==========
+$myTotalOrders = 0;
 $myPendingOrders = 0;
 $myProcessOrders = 0;
 $myCompletedOrders = 0;
 $myTotalSpent = 0;
+$myActiveOrders = 0;
 
-foreach ($myOrders as $order) {
-    if ($order['status_order'] === 'pending') {
-        $myPendingOrders++;
-    } elseif ($order['status_order'] === 'proses') {
-        $myProcessOrders++;
-    } elseif ($order['status_order'] === 'selesai') {
-        $myCompletedOrders++;
-        $myTotalSpent += $order['harga_snapshot'];
+if ($role === 'customer') {
+    $stmt = $db->prepare('SELECT * FROM orders WHERE id_user = ? ORDER BY tanggal_order DESC');
+    $stmt->execute([$userId]);
+    $myOrders = $stmt->fetchAll();
+    
+    $myTotalOrders = count($myOrders);
+    foreach ($myOrders as $order) {
+        if ($order['status_order'] === 'pending') {
+            $myPendingOrders++;
+        } elseif ($order['status_order'] === 'proses') {
+            $myProcessOrders++;
+        } elseif ($order['status_order'] === 'selesai') {
+            $myCompletedOrders++;
+            $myTotalSpent += $order['harga_snapshot'];
+        }
     }
+    $myActiveOrders = $myPendingOrders + $myProcessOrders;
 }
-$myActiveOrders = $myPendingOrders + $myProcessOrders;
 
-// ========== SYSTEM OVERVIEW (SEMUA ORDER DI SISTEM) ==========
-$stmt = $db->query('SELECT * FROM orders ORDER BY tanggal_order DESC');
-$allOrders = $stmt->fetchAll();
-
-$allTotalOrders = count($allOrders);
+// ========== SYSTEM OVERVIEW (UNTUK ADMIN/SUPERVISOR/WORKER) ==========
+$allTotalOrders = 0;
 $allPendingOrders = 0;
 $allProcessOrders = 0;
 $allCompletedOrders = 0;
 $allTotalRevenue = 0;
 
-foreach ($allOrders as $order) {
-    if ($order['status_order'] === 'pending') $allPendingOrders++;
-    elseif ($order['status_order'] === 'proses') $allProcessOrders++;
-    elseif ($order['status_order'] === 'selesai') {
-        $allCompletedOrders++;
-        $allTotalRevenue += $order['harga_snapshot'];
+if ($role !== 'customer') {
+    $stmt = $db->query('SELECT * FROM orders ORDER BY tanggal_order DESC');
+    $allOrders = $stmt->fetchAll();
+    
+    $allTotalOrders = count($allOrders);
+    foreach ($allOrders as $order) {
+        if ($order['status_order'] === 'pending') $allPendingOrders++;
+        elseif ($order['status_order'] === 'proses') $allProcessOrders++;
+        elseif ($order['status_order'] === 'selesai') {
+            $allCompletedOrders++;
+            $allTotalRevenue += $order['harga_snapshot'];
+        }
     }
 }
 ?>
@@ -89,7 +96,7 @@ tailwind.config = {
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 min-h-screen pb-20 md:pb-0">
 
-<!-- Desktop Sidebar - sesuai role -->
+<!-- Desktop Sidebar -->
 <div class="hidden md:flex md:fixed md:inset-y-0 md:left-0 md:w-72 bg-white dark:bg-slate-800 shadow-xl flex-col">
     <div class="flex items-center justify-center p-6 border-b dark:border-slate-700">
         <div class="flex items-center gap-3">
@@ -215,7 +222,8 @@ tailwind.config = {
             </div>
         </div>
 
-        <!-- ========== MY ORDER STATISTICS (UNTUK SEMUA ROLE) ========== -->
+        <!-- ========== UNTUK CUSTOMER: MY ORDER STATISTICS ========== -->
+        <?php if ($role === 'customer'): ?>
         <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4">My Order Statistics</h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div class="stat-card-blue rounded-2xl p-5 text-white shadow-lg transform transition hover:scale-105">
@@ -236,7 +244,7 @@ tailwind.config = {
             </div>
         </div>
 
-        <!-- Additional Stats (Total Spent & Active Orders) -->
+        <!-- Additional Stats for Customer -->
         <div class="grid md:grid-cols-2 gap-6 mb-8">
             <div class="stat-card-sky rounded-2xl p-5 text-white shadow-lg">
                 <div class="flex items-center justify-between">
@@ -257,9 +265,10 @@ tailwind.config = {
                 </div>
             </div>
         </div>
+        <?php endif; ?>
 
-        <!-- ========== SYSTEM OVERVIEW (UNTUK ADMIN/SUPERVISOR/WORKER SAJA) ========== -->
-        <?php if ($role === 'admin' || $role === 'supervisor' || $role === 'worker'): ?>
+        <!-- ========== UNTUK ADMIN/SUPERVISOR/WORKER: SYSTEM OVERVIEW ========== -->
+        <?php if ($role !== 'customer'): ?>
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 mb-6">
             <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                 <span class="material-symbols-outlined text-primary">insights</span>
