@@ -4,11 +4,38 @@ require_worker();
 
 $db = get_db();
 
-// Handle status update
+// Handle status update via dropdown
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'], $_POST['new_status'])) {
     $orderId = $_POST['order_id'];
     $newStatus = $_POST['new_status'];
+    
     if (update_order_status($orderId, $newStatus)) {
+        // Jika status menjadi selesai, insert ke laporan
+        if ($newStatus === 'selesai') {
+            $stmt = $db->prepare('SELECT id_user, tanggal_order, harga_snapshot FROM orders WHERE id_order = ?');
+            $stmt->execute([$orderId]);
+            $order = $stmt->fetch();
+            
+            if ($order) {
+                $stmt = $db->prepare('SELECT COUNT(*) FROM laporan WHERE id_order = ?');
+                $stmt->execute([$orderId]);
+                $exists = $stmt->fetchColumn();
+                
+                if (!$exists) {
+                    $stmt = $db->prepare('
+                        INSERT INTO laporan (id_order, id_user, periode_bulan, periode_tahun, total_harga)
+                        VALUES (?, ?, ?, ?, ?)
+                    ');
+                    $stmt->execute([
+                        $orderId,
+                        $order['id_user'],
+                        date('n', strtotime($order['tanggal_order'])),
+                        date('Y', strtotime($order['tanggal_order'])),
+                        $order['harga_snapshot']
+                    ]);
+                }
+            }
+        }
         set_flash('success', 'Order #' . $orderId . ' status diubah menjadi ' . $newStatus);
     } else {
         set_flash('error', 'Gagal mengubah status order');
@@ -117,6 +144,12 @@ tailwind.config = {
         </div>
         <?php endif; ?>
 
+        <?php if ($error = get_flash('error')): ?>
+        <div class="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 rounded-xl p-3">
+            <p class="text-red-700 dark:text-red-300"><?= htmlspecialchars($error) ?></p>
+        </div>
+        <?php endif; ?>
+
         <!-- Stats -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg">
@@ -137,11 +170,70 @@ tailwind.config = {
             </div>
         </div>
 
+        <!-- Pending Orders Section -->
+        <div class="mb-8">
+            <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-4">Pending Orders</h2>
+            <div class="space-y-3">
+                <?php if (empty($pendingOrders)): ?>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 text-center">
+                    <p class="text-gray-500">Tidak ada pending order</p>
+                </div>
+                <?php else: ?>
+                    <?php foreach($pendingOrders as $order): ?>
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="font-bold">#<?= $order['id_order'] ?></p>
+                                <p class="text-sm text-gray-500"><?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?></p>
+                                <p class="text-sm"><?= $order['service_name'] ?? 'Layanan' ?> - <?= $order['berat_cucian'] ?> kg</p>
+                                <p class="text-primary font-bold mt-1">Rp <?= number_format($order['harga_snapshot'],0,',','.') ?></p>
+                            </div>
+                            <form method="post" action="order_process.php">
+                                <input type="hidden" name="order_id" value="<?= $order['id_order'] ?>">
+                                <input type="hidden" name="action" value="process_order">
+                                <button class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold">Proses Order</button>
+                            </form>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Orders In Process Section -->
+        <div class="mb-8">
+            <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-4">Orders In Process</h2>
+            <div class="space-y-3">
+                <?php if (empty($processOrders)): ?>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 text-center">
+                    <p class="text-gray-500">Tidak ada order dalam proses</p>
+                </div>
+                <?php else: ?>
+                    <?php foreach($processOrders as $order): ?>
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="font-bold">#<?= $order['id_order'] ?></p>
+                                <p class="text-sm text-gray-500"><?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?></p>
+                                <p class="text-sm"><?= $order['service_name'] ?? 'Layanan' ?> - <?= $order['berat_cucian'] ?> kg</p>
+                                <p class="text-primary font-bold mt-1">Rp <?= number_format($order['harga_snapshot'],0,',','.') ?></p>
+                            </div>
+                            <form method="post" action="order_process.php">
+                                <input type="hidden" name="order_id" value="<?= $order['id_order'] ?>">
+                                <input type="hidden" name="action" value="complete_order">
+                                <button class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Selesaikan Order</button>
+                            </form>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <!-- All Orders Table -->
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden">
             <div class="px-6 py-4 border-b dark:border-slate-700">
                 <h2 class="text-lg font-bold text-gray-800 dark:text-white">All Orders (<?= count($allOrders) ?>)</h2>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Klik dropdown untuk mengubah status order</p>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -153,15 +245,12 @@ tailwind.config = {
                             <th class="px-4 py-3 text-center">Weight</th>
                             <th class="px-4 py-3 text-right">Total</th>
                             <th class="px-4 py-3 text-center">Status</th>
-                            <th class="px-4 py-3 text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($allOrders)): ?>
                         <tr>
-                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">
-                                Belum ada order
-                            </td>
+                            <td colspan="6" class="px-4 py-8 text-center text-gray-500">Belum ada order</td>
                         </tr>
                         <?php else: ?>
                             <?php foreach($allOrders as $order): ?>
@@ -175,18 +264,6 @@ tailwind.config = {
                                     <span class="badge <?= $order['status_order'] == 'selesai' ? 'badge-success' : ($order['status_order'] == 'proses' ? 'badge-info' : 'badge-warning') ?>">
                                         <?= $order['status_order'] ?>
                                     </span>
-                                </td>
-                                <td class="px-4 py-3 text-center">
-                                    <form method="post" class="inline-block">
-                                        <input type="hidden" name="order_id" value="<?= $order['id_order'] ?>">
-                                        <select name="new_status" onchange="this.form.submit()" 
-                                            class="text-sm border rounded-lg px-3 py-1.5 cursor-pointer
-                                            <?= $order['status_order'] == 'selesai' ? 'bg-emerald-50 border-emerald-300' : ($order['status_order'] == 'proses' ? 'bg-purple-50 border-purple-300' : 'bg-amber-50 border-amber-300') ?>">
-                                            <option value="pending" <?= $order['status_order'] == 'pending' ? 'selected' : '' ?>>Pending</option>
-                                            <option value="proses" <?= $order['status_order'] == 'proses' ? 'selected' : '' ?>>Proses</option>
-                                            <option value="selesai" <?= $order['status_order'] == 'selesai' ? 'selected' : '' ?>>Selesai</option>
-                                        </select>
-                                    </form>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
