@@ -9,13 +9,16 @@ if (!$user) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'logout') {
-        logout_user();
+        session_destroy();
         header('Location: login.php');
         exit;
     }
 }
 
-$orders = get_orders();
+$db = get_db();
+$stmt = $db->prepare('SELECT COUNT(*) FROM Orders WHERE id_user = ?');
+$stmt->execute([$user['id_user']]);
+$totalOrders = $stmt->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -30,30 +33,48 @@ $orders = get_orders();
 tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary": "#2094f3","background-light": "#f5f7f8","background-dark": "#101a22"}, fontFamily: {"display": ["Inter"]}}}};
 </script>
 </head>
-<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
-<div class="max-w-md mx-auto min-h-screen bg-white dark:bg-slate-900 shadow-xl pt-4 pb-24">
-<!-- Header -->
-<div class="px-4 py-4 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="max-w-md mx-auto min-h-screen bg-white dark:bg-slate-900 shadow-xl">
+<div class="px-4 py-4 flex items-center justify-between border-b">
 <h2 class="text-lg font-bold">Profile</h2>
-<button id="themeToggle" class="text-xs px-2 py-1 rounded-full border text-slate-500 dark:text-slate-200">Mode</button>
+<button id="themeToggle" class="text-xs px-2 py-1 rounded-full border">Mode</button>
 </div>
 
-<!-- Profile Card -->
-<div class="px-4 space-y-4 py-4">
-<div class="border rounded-xl p-4 bg-slate-50 dark:bg-slate-800">
+<div class="p-4 space-y-4">
+<div class="flex justify-center mb-4">
+<div class="bg-primary/10 rounded-full p-6">
+<span class="material-symbols-outlined text-primary text-5xl">account_circle</span>
+</div>
+</div>
+
+<div class="border rounded-xl p-4">
+<p class="text-sm text-slate-500">Nama</p>
+<p class="font-bold text-lg"><?= htmlspecialchars($user['nama'] ?? 'N/A') ?></p>
+</div>
+
+<div class="border rounded-xl p-4">
 <p class="text-sm text-slate-500">Email</p>
-<p class="font-bold"><?= htmlspecialchars($user['email']) ?></p>
-<p class="text-sm text-slate-500 mt-2">Name</p>
-<p class="font-bold"><?= htmlspecialchars($user['name']) ?></p>
-<p class="text-sm text-slate-500 mt-2">Role</p>
-<p class="font-bold px-3 py-1 bg-primary/10 text-primary rounded-full text-xs"><?= htmlspecialchars($user['role']) ?></p>
+<p class="font-semibold"><?= htmlspecialchars($user['email']) ?></p>
 </div>
 
-<div class="border rounded-xl p-4 bg-slate-50 dark:bg-slate-800">
+<div class="border rounded-xl p-4">
+<p class="text-sm text-slate-500">No. HP</p>
+<p class="font-semibold"><?= htmlspecialchars($user['no_hp'] ?? 'N/A') ?></p>
+</div>
+
+<div class="border rounded-xl p-4">
+<p class="text-sm text-slate-500">Alamat</p>
+<p class="font-semibold"><?= htmlspecialchars($user['alamat'] ?? 'N/A') ?></p>
+</div>
+
+<div class="border rounded-xl p-4">
+<p class="text-sm text-slate-500">Role</p>
+<span class="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold"><?= htmlspecialchars($user['role']) ?></span>
+</div>
+
+<div class="border rounded-xl p-4">
 <p class="text-sm text-slate-500">Total Orders</p>
-<p class="font-bold text-2xl"><?= $user['role'] === 'customer' ? count(get_orders(get_db_wrapper(), $user['id'])) : 'Admin view' ?></p>
-<p class="text-sm text-slate-500 mt-1">Draft Order</p>
-<p class="font-bold"><?= empty(get_current_order()) ? 'None' : 'Active' ?></p>
+<p class="font-bold text-2xl"><?= $totalOrders ?></p>
 </div>
 
 <form method="post">
@@ -63,16 +84,15 @@ tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary": "#209
 </div>
 
 <!-- Bottom Nav -->
-<div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-20 border-t bg-white dark:bg-slate-900 px-4 pb-6 pt-2">
+<div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto border-t bg-white dark:bg-slate-900 px-4 pb-6 pt-2">
 <div class="flex gap-2">
-<a href="dashboard.php" class="flex-1 text-center text-slate-500">Home</a>
-<a href="history.php" class="flex-1 text-center text-slate-500">Orders</a>
-<a href="price.php" class="flex-1 text-center text-slate-500">Pricing</a>
-<a class="flex-1 text-center text-primary font-bold" href="profile.php">Profile</a>
+<a href="dashboard.php" class="flex-1 text-center text-slate-500 py-2">Home</a>
+<a href="neworder.php" class="flex-1 text-center text-slate-500 py-2">New Order</a>
+<a href="history.php" class="flex-1 text-center text-slate-500 py-2">History</a>
+<a href="profile.php" class="flex-1 text-center text-primary font-bold py-2">Profile</a>
 </div>
 </div>
 
 <?= global_route_script() ?>
 </body>
 </html>
-

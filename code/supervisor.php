@@ -2,13 +2,9 @@
 require_once 'common.php';
 require_supervisor();
 
-$db = get_db_wrapper();
-
-// Verify payment POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_order_id'])) {
     $orderId = $_POST['verify_order_id'];
-    $stmt = $db->prepare('UPDATE orders SET payment_status = "verified", status = "Pending Pickup" WHERE id = ?');
-    if ($stmt->execute([$orderId])) {
+    if (verify_payment($orderId)) {
         set_flash('success', 'Payment verified for order #' . $orderId);
     } else {
         set_flash('error', 'Failed to verify payment.');
@@ -17,10 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_order_id'])) {
     exit;
 }
 
-// Get pending payments
-$stmt = $db->prepare('SELECT o.*, u.name as customer_name, s.name as service_type FROM orders o LEFT JOIN users u ON o.user_id = u.id LEFT JOIN services s ON o.service_id = s.id WHERE o.payment_status = "paid" AND o.status = "Pending Pickup" ORDER BY o.created_at DESC');
-$stmt->execute();
-$pendingPayments = $stmt->fetchAll();
+$pendingOrders = get_pending_orders();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -35,51 +28,43 @@ $pendingPayments = $stmt->fetchAll();
 tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary": "#2094f3","background-light": "#f5f7f8","background-dark": "#101a22"}, fontFamily: {"display": ["Inter"]}}}};
 </script>
 </head>
-<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
-<div class="max-w-md mx-auto min-h-screen bg-white dark:bg-slate-900 shadow-xl pt-4 pb-24">
-<!-- Header -->
-<div class="px-4 py-4 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="max-w-md mx-auto min-h-screen bg-white dark:bg-slate-900 shadow-xl pb-24">
+<div class="px-4 py-4 flex items-center justify-between border-b">
 <h2 class="text-lg font-bold">Pending Payments</h2>
-<button id="themeToggle" class="text-xs px-2 py-1 rounded-full border text-slate-500 dark:text-slate-200">Mode</button>
+<button id="themeToggle" class="text-xs px-2 py-1 rounded-full border">Mode</button>
 </div>
 
-<!-- Flash Messages -->
-<div class="px-4 mt-3">
 <?php if ($msg = get_flash('success')): ?>
-<div class="mb-4 bg-emerald-100 border border-emerald-200 text-emerald-800 p-3 rounded-lg"><?= htmlspecialchars($msg) ?></div>
+<div class="mx-4 mt-3 bg-emerald-100 text-emerald-800 p-3 rounded-lg"><?= htmlspecialchars($msg) ?></div>
 <?php endif; ?>
-<?php if ($err = get_flash('error')): ?>
-<div class="mb-4 bg-red-100 border border-red-200 text-red-800 p-3 rounded-lg"><?= htmlspecialchars($err) ?></div>
-<?php endif; ?>
-</div>
 
-<!-- Pending List -->
-<div class="px-4 space-y-3">
-<h3 class="font-bold text-lg">Orders to Verify (<?= count($pendingPayments) ?>)</h3>
-<?php if (empty($pendingPayments)): ?>
+<div class="p-4">
+<h3 class="font-bold text-lg">Orders to Verify (<?= count($pendingOrders) ?>)</h3>
+<div class="space-y-3 mt-3">
+<?php if (empty($pendingOrders)): ?>
 <p class="text-slate-500 text-center py-8">No pending payments.</p>
 <?php else: ?>
-<?php foreach ($pendingPayments as $order): ?>
+<?php foreach ($pendingOrders as $order): ?>
 <div class="border rounded-xl p-4 bg-slate-50 dark:bg-slate-800">
-<p class="font-bold">#<?= $order['id'] ?> <?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?></p>
-<p class="text-sm"><?= htmlspecialchars($order['service_type'] ?? 'N/A') ?> - <?= $order['weight'] ?>kg</p>
-<p class="text-primary font-bold">Rp <?= number_format($order['total'],0,',','.') ?></p>
+<p class="font-bold">#<?= $order['id_order'] ?> - <?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?></p>
+<p class="text-sm"><?= htmlspecialchars($order['service_name'] ?? 'N/A') ?> - <?= $order['berat_cucian'] ?> kg</p>
+<p class="text-primary font-bold">Rp <?= number_format($order['harga_snapshot'],0,',','.') ?></p>
 <form method="post" class="mt-3">
-<input type="hidden" name="verify_order_id" value="<?= $order['id'] ?>">
+<input type="hidden" name="verify_order_id" value="<?= $order['id_order'] ?>">
 <button class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold">Verify Payment</button>
 </form>
 </div>
 <?php endforeach; ?>
 <?php endif; ?>
 </div>
+</div>
 
 <!-- Bottom Nav -->
-<div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-20 border-t bg-white dark:bg-slate-900 px-4 pb-6 pt-2">
+<div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto border-t bg-white dark:bg-slate-900 px-4 pb-6 pt-2">
 <div class="flex gap-2">
 <a href="supervisor.php" class="flex-1 text-center text-primary font-bold py-2">Payments</a>
-<a href="history.php" class="flex-1 text-center">History</a>
-<a href="price.php" class="flex-1 text-center">Pricing</a>
-<a href="profile.php" class="flex-1 text-center">Profile</a>
+<a href="profile.php" class="flex-1 text-center text-slate-500 py-2">Profile</a>
 </div>
 </div>
 

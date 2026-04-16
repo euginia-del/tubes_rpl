@@ -8,7 +8,7 @@ require_once __DIR__ . '/koneksi.php';
 function get_db() {
     static $db = null;
     if ($db === null) {
-        $dsn = 'mysql:host=localhost;dbname=laundry;charset=utf8mb4';
+        $dsn = 'mysql:host=localhost;dbname=laundry_db;charset=utf8mb4';
         $options = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC];
         $db = new PDO($dsn, 'root', '', $options);
     }
@@ -58,41 +58,72 @@ function require_admin($db = null) {
 function currentUser($db = null) {
     if (!$db) $db = get_db();
     if (empty($_SESSION['user_id'])) return null;
-    $stmt = $db->prepare('SELECT * FROM users WHERE id = ?');
+    $stmt = $db->prepare('SELECT * FROM User WHERE id_user = ?');
     $stmt->execute([$_SESSION['user_id']]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
 function update_order_status($order_id, $new_status, $db = null) {
     $db = $db ?: get_db();
-    $stmt = $db->prepare('UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?');
-    $success = $stmt->execute([$new_status, $order_id]);
-    
-    $user = currentUser($db);
-    $stmt_log = $db->prepare('INSERT INTO order_status_log (order_id, status, changed_by) VALUES (?, ?, ?)');
-    $stmt_log->execute([$order_id, $new_status, $user['id'] ?? null]);
-    
-    return $success;
+    $stmt = $db->prepare('UPDATE Orders SET status_order = ? WHERE id_order = ?');
+    return $stmt->execute([$new_status, $order_id]);
 }
 
-function get_orders($db = null) {
+function get_all_orders($db = null) {
     $db = $db ?: get_db();
-    $stmt = $db->prepare('SELECT o.*, u.name as customer_name FROM orders o LEFT JOIN users u ON o.user_id = u.id WHERE o.status != "Completed" ORDER BY created_at DESC');
+    $stmt = $db->prepare('SELECT o.*, u.nama as customer_name, u.no_hp, u.alamat, l.nama_layanan as service_name 
+        FROM Orders o 
+        LEFT JOIN User u ON o.id_user = u.id_user 
+        LEFT JOIN Layanan l ON o.id_layanan = l.id_layanan 
+        ORDER BY o.tanggal_order DESC');
     $stmt->execute();
+    return $stmt->fetchAll();
+}
+
+function get_orders($db = null, $user_id = null) {
+    $db = $db ?: get_db();
+    if ($user_id) {
+        $stmt = $db->prepare('SELECT o.*, u.nama as customer_name, l.nama_layanan as service_name 
+            FROM Orders o 
+            LEFT JOIN User u ON o.id_user = u.id_user 
+            LEFT JOIN Layanan l ON o.id_layanan = l.id_layanan 
+            WHERE o.id_user = ? 
+            ORDER BY o.tanggal_order DESC');
+        $stmt->execute([$user_id]);
+    } else {
+        $stmt = $db->prepare('SELECT o.*, u.nama as customer_name, l.nama_layanan as service_name 
+            FROM Orders o 
+            LEFT JOIN User u ON o.id_user = u.id_user 
+            LEFT JOIN Layanan l ON o.id_layanan = l.id_layanan 
+            WHERE o.status_order != "selesai" 
+            ORDER BY o.tanggal_order DESC');
+        $stmt->execute();
+    }
     return $stmt->fetchAll();
 }
 
 function get_order($id, $db = null) {
     $db = $db ?: get_db();
-    $stmt = $db->prepare('SELECT o.*, u.name as customer_name FROM orders o LEFT JOIN users u ON o.user_id = u.id WHERE o.id = ?');
+    $stmt = $db->prepare('SELECT o.*, u.nama as customer_name, u.alamat, u.no_hp, l.nama_layanan as service_name, l.harga_per_kg
+        FROM Orders o 
+        LEFT JOIN User u ON o.id_user = u.id_user 
+        LEFT JOIN Layanan l ON o.id_layanan = l.id_layanan 
+        WHERE o.id_order = ?');
     $stmt->execute([$id]);
     return $stmt->fetch();
 }
 
 function get_services($db = null) {
     $db = $db ?: get_db();
-    $stmt = $db->query('SELECT * FROM services WHERE is_active = 1');
+    $stmt = $db->query('SELECT * FROM Layanan');
     return $stmt->fetchAll();
+}
+
+function get_service($id, $db = null) {
+    $db = $db ?: get_db();
+    $stmt = $db->prepare('SELECT * FROM Layanan WHERE id_layanan = ?');
+    $stmt->execute([$id]);
+    return $stmt->fetch();
 }
 
 function set_flash($key, $message) {
@@ -110,10 +141,106 @@ function get_flash($key) {
 
 function loginUser($email, $password) {
     $db = get_db();
-    $stmt = $db->prepare('SELECT * FROM users WHERE email = ?');
+    $stmt = $db->prepare('SELECT * FROM User WHERE email = ?');
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $user && $password === $user['password'] ? $user : false;
+    return ($user && $password === $user['password']) ? $user : false;
+}
+
+function logout_user() {
+    session_destroy();
+    session_start();
+}
+
+function is_logged_in() {
+    return isset($_SESSION['user_id']);
+}
+
+function set_current_order($data) {
+    $_SESSION['current_order'] = array_merge($_SESSION['current_order'] ?? [], $data);
+}
+
+function get_current_order() {
+    return $_SESSION['current_order'] ?? [];
+}
+
+function clear_current_order() {
+    unset($_SESSION['current_order']);
+}
+
+function create_order($db = null) {
+    $db = $db ?: get_db();
+    $current = get_current_order();
+    $user = currentUser($db);
+    
+    if (empty($current) || !$user) return false;
+    
+    $stmt = $db->prepare('INSERT INTO Orders (id_user, id_layanan, tanggal_order, status_order, harga_snapshot, berat_cucian, catatan) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)');
+    
+    $id_layanan = $current['id_layanan'] ?? 1;
+    $hargaSnapshot = $current['total_price'] ?? 50000;
+    $beratCucian = $current['weight'] ?? 1;
+    $catatan = $current['notes'] ?? '';
+    
+    $success = $stmt->execute([
+        $user['id_user'],
+        $id_layanan,
+        date('Y-m-d'),
+        'pending',
+        $hargaSnapshot,
+        $beratCucian,
+        $catatan
+    ]);
+    
+    if ($success) {
+        $orderId = $db->lastInsertId();
+        clear_current_order();
+        return $orderId;
+    }
+    return false;
+}
+
+function get_pending_orders($db = null) {
+    $db = $db ?: get_db();
+    $stmt = $db->prepare('SELECT o.*, u.nama as customer_name, l.nama_layanan as service_name 
+        FROM Orders o 
+        LEFT JOIN User u ON o.id_user = u.id_user 
+        LEFT JOIN Layanan l ON o.id_layanan = l.id_layanan 
+        WHERE o.status_order = "pending" 
+        ORDER BY o.tanggal_order DESC');
+    $stmt->execute();
+    return $stmt->fetchAll();
+}
+
+function verify_payment($order_id, $db = null) {
+    $db = $db ?: get_db();
+    $stmt = $db->prepare('UPDATE Orders SET status_order = "proses" WHERE id_order = ?');
+    return $stmt->execute([$order_id]);
+}
+
+function get_user_count($db = null) {
+    $db = $db ?: get_db();
+    $stmt = $db->query('SELECT COUNT(*) FROM User');
+    return $stmt->fetchColumn();
+}
+
+function get_order_count($db = null) {
+    $db = $db ?: get_db();
+    $stmt = $db->query('SELECT COUNT(*) FROM Orders');
+    return $stmt->fetchColumn();
+}
+
+function get_completed_orders_count($db = null) {
+    $db = $db ?: get_db();
+    $stmt = $db->query('SELECT COUNT(*) FROM Orders WHERE status_order = "selesai"');
+    return $stmt->fetchColumn();
+}
+
+function get_pending_orders_count($db = null) {
+    $db = $db ?: get_db();
+    $stmt = $db->query('SELECT COUNT(*) FROM Orders WHERE status_order = "pending"');
+    return $stmt->fetchColumn();
 }
 
 function global_route_script() {
@@ -145,4 +272,3 @@ function global_route_script() {
 </script>';
 }
 ?>
-
