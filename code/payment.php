@@ -2,7 +2,8 @@
 require_once 'common.php';
 $user = require_customer();
 
-$order_id = $_GET['order_id'] ?? null;
+// Ambil order_id dari URL atau dari session
+$order_id = $_GET['order_id'] ?? $_SESSION['last_order_id'] ?? null;
 if (!$order_id) {
     header('Location: history.php');
     exit;
@@ -49,9 +50,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['konfirmasi'])) {
             // UPDATE STATUS ORDER LANGSUNG KE PROSES
             update_order_status($order_id, 'proses');
             
-            // CATAT KE PEMBAYARAN (status langsung lunas karena pakai saldo)
+            // CATAT KE PEMBAYARAN
             $stmt = $db->prepare('INSERT INTO pembayaran (id_order, metode, nomor_transaksi, tanggal_pembayaran, jumlah_bayar, status_bayar) VALUES (?, ?, ?, NOW(), ?, "lunas")');
             $stmt->execute([$order_id, $metode, $nomor_transaksi, $order['harga_snapshot']]);
+            
+            // Hapus session order
+            clear_current_order();
             
             set_flash('success', 'Pembayaran berhasil! Saldo berkurang Rp ' . number_format($order['harga_snapshot'], 0, ',', '.'));
             header('Location: order_details_process.php?order=' . $order_id);
@@ -62,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['konfirmasi'])) {
             exit;
         }
     } else {
-        // Upload bukti untuk metode lain (GoPay, DANA, Bank, Tunai)
+        // Upload bukti untuk metode lain
         $bukti_pembayaran = null;
         if (isset($_FILES['bukti_pembayaran']) && $_FILES['bukti_pembayaran']['error'] === UPLOAD_ERR_OK) {
             $upload_dir = 'uploads/bukti_pembayaran/';
@@ -74,9 +78,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['konfirmasi'])) {
         
         $catatan = $_POST['catatan'] ?? '';
         
-        // SIMPAN KE PEMBAYARAN (status pending, menunggu verifikasi admin)
+        // SIMPAN KE PEMBAYARAN
         $stmt = $db->prepare('INSERT INTO pembayaran (id_order, metode, nomor_transaksi, tanggal_pembayaran, jumlah_bayar, status_bayar, bukti_pembayaran, catatan_pembayaran) VALUES (?, ?, ?, NOW(), ?, "pending", ?, ?)');
         $stmt->execute([$order_id, $metode, $nomor_transaksi, $order['harga_snapshot'], $bukti_pembayaran, $catatan]);
+        
+        // Hapus session order
+        clear_current_order();
         
         set_flash('success', 'Pembayaran via ' . strtoupper($metode) . ' berhasil! No. Transaksi: ' . $nomor_transaksi . '. Menunggu verifikasi admin.');
         header('Location: order_details_process.php?order=' . $order_id);
@@ -154,12 +161,8 @@ function goBack() {
 
     <!-- Order Summary -->
     <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 mb-6">
-        <h2 class="text-lg font-bold text-gray-800 dark:text-white mb-4">Ringkasan Order</h2>
+        <h2 class="text-lg font-bold text-gray-800 dark:text-white mb-4">Ringkasan Order #<?= $order['id_order'] ?></h2>
         <div class="space-y-3">
-            <div class="flex justify-between">
-                <span class="text-gray-500">Order #</span>
-                <span class="font-semibold"><?= $order['id_order'] ?></span>
-            </div>
             <div class="flex justify-between">
                 <span class="text-gray-500">Layanan</span>
                 <span class="font-semibold"><?= htmlspecialchars($order['service_name']) ?></span>
@@ -307,7 +310,8 @@ function goBack() {
                     2. Ikuti instruksi pembayaran<br>
                     3. Upload bukti transfer (jika diperlukan)<br>
                     4. Klik Konfirmasi Pembayaran<br>
-                    5. Admin akan memverifikasi pembayaran Anda
+                    5. Dapatkan nomor resi transaksi<br>
+                    6. Admin akan memverifikasi pembayaran Anda
                 </p>
             </div>
         </div>

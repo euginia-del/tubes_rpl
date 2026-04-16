@@ -2,18 +2,6 @@
 require_once 'common.php';
 $user = require_customer();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $orderId = create_order();
-    if ($orderId) {
-        set_flash('success', 'Order #' . $orderId . ' berhasil dibuat!');
-        header('Location: history.php');
-        exit;
-    }
-    set_flash('error', 'Gagal membuat order.');
-    header('Location: neworder.php');
-    exit;
-}
-
 $currentOrder = get_current_order();
 if (empty($currentOrder)) {
     header('Location: neworder.php');
@@ -116,17 +104,17 @@ tailwind.config = {
                 Pickup Schedule
             </h2>
             
-            <form method="post" class="space-y-5">
+            <form method="post" id="scheduleForm" class="space-y-5">
                 <div>
                     <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-2">Pickup Date</label>
-                    <input type="date" id="pickup_date" 
+                    <input type="date" name="pickup_date" id="pickup_date" 
                            class="w-full border border-gray-200 dark:border-slate-600 rounded-xl p-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary"
                            value="<?= date('Y-m-d', strtotime('+1 day')) ?>" required>
                 </div>
 
                 <div>
                     <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-2">Pickup Time</label>
-                    <select id="pickup_time" 
+                    <select name="pickup_time" id="pickup_time" 
                             class="w-full border border-gray-200 dark:border-slate-600 rounded-xl p-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary">
                         <option value="08:00-10:00">🌅 08:00 - 10:00 (Morning)</option>
                         <option value="10:00-12:00">☀️ 10:00 - 12:00 (Late Morning)</option>
@@ -137,18 +125,14 @@ tailwind.config = {
 
                 <div>
                     <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-2">Pickup Address</label>
-                    <textarea id="address" rows="3" 
+                    <textarea name="pickup_address" id="pickup_address" rows="3" 
                               class="w-full border border-gray-200 dark:border-slate-600 rounded-xl p-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary" 
                               placeholder="Enter your complete address" required><?= htmlspecialchars($user['alamat'] ?? '') ?></textarea>
                 </div>
 
-                <input type="hidden" name="pickup_date" id="form_pickup_date">
-                <input type="hidden" name="pickup_time" id="form_pickup_time">
-                <input type="hidden" name="address" id="form_address">
-
                 <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark text-white font-bold py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2">
                     <span class="material-symbols-outlined">check_circle</span>
-                    <span>Confirm Order</span>
+                    <span>Buat Order & Lanjut ke Pembayaran</span>
                 </button>
             </form>
         </div>
@@ -156,10 +140,37 @@ tailwind.config = {
 </div>
 
 <script>
-document.querySelector('form').addEventListener('submit', function(e) {
-    document.getElementById('form_pickup_date').value = document.getElementById('pickup_date').value;
-    document.getElementById('form_pickup_time').value = document.getElementById('pickup_time').value;
-    document.getElementById('form_address').value = document.getElementById('address').value;
+document.getElementById('scheduleForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Ambil data dari form
+    var pickup_date = document.getElementById('pickup_date').value;
+    var pickup_time = document.getElementById('pickup_time').value;
+    var pickup_address = document.getElementById('pickup_address').value;
+    
+    // Kirim via fetch API untuk membuat order
+    fetch('create_order_api.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            pickup_date: pickup_date,
+            pickup_time: pickup_time,
+            pickup_address: pickup_address
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Redirect ke halaman pembayaran
+            window.location.href = 'payment.php?order_id=' + data.order_id;
+        } else {
+            alert('Gagal membuat order: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Terjadi kesalahan, silakan coba lagi');
+    });
 });
 </script>
 

@@ -156,7 +156,6 @@ function create_order($db = null) {
         VALUES (?, ?, ?, ?, ?, ?, ?)');
     
     $id_layanan = $current['id_layanan'] ?? 1;
-    // Gunakan total_price yang sudah termasuk diskon
     $hargaSnapshot = $current['total_price'] ?? 50000;
     $beratCucian = $current['weight'] ?? 1;
     $catatan = $current['notes'] ?? '';
@@ -173,7 +172,8 @@ function create_order($db = null) {
     
     if ($success) {
         $orderId = $db->lastInsertId();
-        clear_current_order();
+        // Simpan order_id ke session untuk digunakan di payment
+        $_SESSION['last_order_id'] = $orderId;
         return $orderId;
     }
     return false;
@@ -207,6 +207,7 @@ function get_current_order() {
 
 function clear_current_order() {
     unset($_SESSION['current_order']);
+    unset($_SESSION['last_order_id']);
 }
 
 function get_services($db = null) {
