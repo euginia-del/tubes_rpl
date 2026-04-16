@@ -26,11 +26,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reject_order_id'])) {
     $orderId = $_POST['reject_order_id'];
     $alasan = $_POST['alasan_penolakan'] ?? 'Bukti tidak valid';
     
-    // Update payment status
     $stmt = $db->prepare('UPDATE pembayaran SET status_bayar = "gagal", catatan_pembayaran = CONCAT(IFNULL(catatan_pembayaran, ""), " | Ditolak: ", ?) WHERE id_order = ?');
     $stmt->execute([$alasan, $orderId]);
     
-    set_flash('error', 'Pembayaran order #' . $orderId . ' ditolak. Alasan: ' . $alasan);
+    set_flash('error', 'Pembayaran order #' . $orderId . ' ditolak.');
     header('Location: verify_payments.php');
     exit;
 }
@@ -53,6 +52,10 @@ $pendingPayments = $stmt->fetchAll();
 // Get statistics
 $stats = $db->query('SELECT COUNT(*) as total, SUM(jumlah_bayar) as total_nominal FROM pembayaran WHERE status_bayar = "lunas"')->fetch();
 $pendingCount = $db->query('SELECT COUNT(*) FROM pembayaran WHERE status_bayar = "pending"')->fetchColumn();
+$allPayments = $db->query('SELECT COUNT(*) FROM pembayaran')->fetchColumn();
+
+// Debug: Cek apakah koneksi database berhasil
+$testQuery = $db->query('SELECT COUNT(*) FROM orders')->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -155,6 +158,14 @@ tailwind.config = {
     <div class="container-responsive py-6">
         <h1 class="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-6">Verifikasi Pembayaran</h1>
 
+        <!-- Debug Info -->
+        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 mb-4 text-sm">
+            <p>📊 Total Orders di database: <strong><?= $testQuery ?></strong></p>
+            <p>💰 Total Pembayaran di database: <strong><?= $allPayments ?></strong></p>
+            <p>⏳ Menunggu Verifikasi: <strong><?= $pendingCount ?></strong></p>
+            <p>📋 Data yang ditampilkan: <strong><?= count($pendingPayments) ?></strong></p>
+        </div>
+
         <!-- Stats -->
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
             <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg">
@@ -196,6 +207,21 @@ tailwind.config = {
                     <span class="material-symbols-outlined text-6xl text-gray-400">check_circle</span>
                     <p class="text-gray-500 dark:text-gray-400 mt-4">Tidak ada pembayaran yang menunggu verifikasi</p>
                     <p class="text-gray-400 text-sm mt-2">Customer akan upload bukti setelah melakukan pembayaran</p>
+                    
+                    <!-- Panduan untuk testing -->
+                    <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-left">
+                        <p class="font-semibold text-blue-800 dark:text-blue-300 mb-2">📌 Cara Menambahkan Data Pembayaran:</p>
+                        <ol class="text-sm text-blue-700 dark:text-blue-400 list-decimal list-inside space-y-1">
+                            <li>Login sebagai Customer (michel@gmail.com / michel123)</li>
+                            <li>Buat order baru di New Order</li>
+                            <li>Setelah order dibuat, buka detail order</li>
+                            <li>Klik tombol "Bayar Sekarang"</li>
+                            <li>Pilih metode pembayaran (GoPay/DANA/Bank Transfer)</li>
+                            <li>Upload bukti pembayaran (file gambar)</li>
+                            <li>Klik Konfirmasi Pembayaran</li>
+                            <li>Data akan muncul di halaman ini</li>
+                        </ol>
+                    </div>
                 </div>
                 <?php else: ?>
                 <div class="space-y-4">
@@ -222,7 +248,7 @@ tailwind.config = {
                                 <?php endif; ?>
                                 
                                 <?php if ($payment['catatan_pembayaran']): ?>
-                                <p class="text-xs text-gray-500 mt-1">📝 Catatan Customer: <?= htmlspecialchars($payment['catatan_pembayaran']) ?></p>
+                                <p class="text-xs text-gray-500 mt-1">📝 Catatan: <?= htmlspecialchars($payment['catatan_pembayaran']) ?></p>
                                 <?php endif; ?>
                                 
                                 <?php if ($payment['bukti_pembayaran'] && file_exists($payment['bukti_pembayaran'])): ?>
@@ -231,10 +257,6 @@ tailwind.config = {
                                         <span class="material-symbols-outlined text-sm">receipt</span>
                                         Lihat Bukti Pembayaran
                                     </a>
-                                </div>
-                                <?php else: ?>
-                                <div class="mt-2 text-red-500 text-xs">
-                                    ⚠️ Tidak ada bukti pembayaran
                                 </div>
                                 <?php endif; ?>
                             </div>
