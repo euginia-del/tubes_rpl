@@ -12,8 +12,4 @@ function get_db() {
     }
     return $db;
 }
-
-function get_db_wrapper() {
-    return get_db();
-}
 ?>

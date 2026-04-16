@@ -58,23 +58,23 @@ function require_admin($db = null) {
 function currentUser($db = null) {
     if (!$db) $db = get_db();
     if (empty($_SESSION['user_id'])) return null;
-    $stmt = $db->prepare('SELECT * FROM User WHERE id_user = ?');
+    $stmt = $db->prepare('SELECT * FROM user WHERE id_user = ?');
     $stmt->execute([$_SESSION['user_id']]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
 function update_order_status($order_id, $new_status, $db = null) {
     $db = $db ?: get_db();
-    $stmt = $db->prepare('UPDATE Orders SET status_order = ? WHERE id_order = ?');
+    $stmt = $db->prepare('UPDATE orders SET status_order = ? WHERE id_order = ?');
     return $stmt->execute([$new_status, $order_id]);
 }
 
 function get_all_orders($db = null) {
     $db = $db ?: get_db();
     $stmt = $db->prepare('SELECT o.*, u.nama as customer_name, u.no_hp, u.alamat, l.nama_layanan as service_name 
-        FROM Orders o 
-        LEFT JOIN User u ON o.id_user = u.id_user 
-        LEFT JOIN Layanan l ON o.id_layanan = l.id_layanan 
+        FROM orders o 
+        LEFT JOIN user u ON o.id_user = u.id_user 
+        LEFT JOIN layanan l ON o.id_layanan = l.id_layanan 
         ORDER BY o.tanggal_order DESC');
     $stmt->execute();
     return $stmt->fetchAll();
@@ -84,18 +84,18 @@ function get_orders($db = null, $user_id = null) {
     $db = $db ?: get_db();
     if ($user_id) {
         $stmt = $db->prepare('SELECT o.*, u.nama as customer_name, l.nama_layanan as service_name 
-            FROM Orders o 
-            LEFT JOIN User u ON o.id_user = u.id_user 
-            LEFT JOIN Layanan l ON o.id_layanan = l.id_layanan 
+            FROM orders o 
+            LEFT JOIN user u ON o.id_user = u.id_user 
+            LEFT JOIN layanan l ON o.id_layanan = l.id_layanan 
             WHERE o.id_user = ? 
             ORDER BY o.tanggal_order DESC');
         $stmt->execute([$user_id]);
     } else {
         $stmt = $db->prepare('SELECT o.*, u.nama as customer_name, l.nama_layanan as service_name 
-            FROM Orders o 
-            LEFT JOIN User u ON o.id_user = u.id_user 
-            LEFT JOIN Layanan l ON o.id_layanan = l.id_layanan 
-            WHERE o.status_order != "selesai" 
+            FROM orders o 
+            LEFT JOIN user u ON o.id_user = u.id_user 
+            LEFT JOIN layanan l ON o.id_layanan = l.id_layanan 
+            WHERE o.status_order = "proses" 
             ORDER BY o.tanggal_order DESC');
         $stmt->execute();
     }
@@ -105,9 +105,9 @@ function get_orders($db = null, $user_id = null) {
 function get_order($id, $db = null) {
     $db = $db ?: get_db();
     $stmt = $db->prepare('SELECT o.*, u.nama as customer_name, u.alamat, u.no_hp, l.nama_layanan as service_name, l.harga_per_kg
-        FROM Orders o 
-        LEFT JOIN User u ON o.id_user = u.id_user 
-        LEFT JOIN Layanan l ON o.id_layanan = l.id_layanan 
+        FROM orders o 
+        LEFT JOIN user u ON o.id_user = u.id_user 
+        LEFT JOIN layanan l ON o.id_layanan = l.id_layanan 
         WHERE o.id_order = ?');
     $stmt->execute([$id]);
     return $stmt->fetch();
@@ -115,13 +115,13 @@ function get_order($id, $db = null) {
 
 function get_services($db = null) {
     $db = $db ?: get_db();
-    $stmt = $db->query('SELECT * FROM Layanan');
+    $stmt = $db->query('SELECT * FROM layanan');
     return $stmt->fetchAll();
 }
 
 function get_service($id, $db = null) {
     $db = $db ?: get_db();
-    $stmt = $db->prepare('SELECT * FROM Layanan WHERE id_layanan = ?');
+    $stmt = $db->prepare('SELECT * FROM layanan WHERE id_layanan = ?');
     $stmt->execute([$id]);
     return $stmt->fetch();
 }
@@ -141,9 +141,10 @@ function get_flash($key) {
 
 function loginUser($email, $password) {
     $db = get_db();
-    $stmt = $db->prepare('SELECT * FROM User WHERE email = ?');
+    $stmt = $db->prepare('SELECT * FROM user WHERE email = ?');
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Password comparison (plain text as per your current implementation)
     return ($user && $password === $user['password']) ? $user : false;
 }
 
@@ -175,7 +176,7 @@ function create_order($db = null) {
     
     if (empty($current) || !$user) return false;
     
-    $stmt = $db->prepare('INSERT INTO Orders (id_user, id_layanan, tanggal_order, status_order, harga_snapshot, berat_cucian, catatan) 
+    $stmt = $db->prepare('INSERT INTO orders (id_user, id_layanan, tanggal_order, status_order, harga_snapshot, berat_cucian, catatan) 
         VALUES (?, ?, ?, ?, ?, ?, ?)');
     
     $id_layanan = $current['id_layanan'] ?? 1;
@@ -204,9 +205,9 @@ function create_order($db = null) {
 function get_pending_orders($db = null) {
     $db = $db ?: get_db();
     $stmt = $db->prepare('SELECT o.*, u.nama as customer_name, l.nama_layanan as service_name 
-        FROM Orders o 
-        LEFT JOIN User u ON o.id_user = u.id_user 
-        LEFT JOIN Layanan l ON o.id_layanan = l.id_layanan 
+        FROM orders o 
+        LEFT JOIN user u ON o.id_user = u.id_user 
+        LEFT JOIN layanan l ON o.id_layanan = l.id_layanan 
         WHERE o.status_order = "pending" 
         ORDER BY o.tanggal_order DESC');
     $stmt->execute();
@@ -215,31 +216,37 @@ function get_pending_orders($db = null) {
 
 function verify_payment($order_id, $db = null) {
     $db = $db ?: get_db();
-    $stmt = $db->prepare('UPDATE Orders SET status_order = "proses" WHERE id_order = ?');
+    $stmt = $db->prepare('UPDATE orders SET status_order = "proses" WHERE id_order = ?');
     return $stmt->execute([$order_id]);
 }
 
 function get_user_count($db = null) {
     $db = $db ?: get_db();
-    $stmt = $db->query('SELECT COUNT(*) FROM User');
+    $stmt = $db->query('SELECT COUNT(*) FROM user');
     return $stmt->fetchColumn();
 }
 
 function get_order_count($db = null) {
     $db = $db ?: get_db();
-    $stmt = $db->query('SELECT COUNT(*) FROM Orders');
+    $stmt = $db->query('SELECT COUNT(*) FROM orders');
     return $stmt->fetchColumn();
 }
 
 function get_completed_orders_count($db = null) {
     $db = $db ?: get_db();
-    $stmt = $db->query('SELECT COUNT(*) FROM Orders WHERE status_order = "selesai"');
+    $stmt = $db->query('SELECT COUNT(*) FROM orders WHERE status_order = "selesai"');
     return $stmt->fetchColumn();
 }
 
 function get_pending_orders_count($db = null) {
     $db = $db ?: get_db();
-    $stmt = $db->query('SELECT COUNT(*) FROM Orders WHERE status_order = "pending"');
+    $stmt = $db->query('SELECT COUNT(*) FROM orders WHERE status_order = "pending"');
+    return $stmt->fetchColumn();
+}
+
+function get_processed_orders_count($db = null) {
+    $db = $db ?: get_db();
+    $stmt = $db->query('SELECT COUNT(*) FROM orders WHERE status_order = "proses"');
     return $stmt->fetchColumn();
 }
 
