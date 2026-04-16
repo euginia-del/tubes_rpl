@@ -15,7 +15,7 @@ $db = get_db();
 $role = $user['role'];
 $userId = $user['id_user'];
 
-// ========== MY ORDER STATISTICS (HANYA UNTUK CUSTOMER) ==========
+// ========== MY ORDER STATISTICS (UNTUK CUSTOMER) ==========
 $myTotalOrders = 0;
 $myPendingOrders = 0;
 $myProcessOrders = 0;
@@ -30,11 +30,9 @@ if ($role === 'customer') {
     
     $myTotalOrders = count($myOrders);
     foreach ($myOrders as $order) {
-        if ($order['status_order'] === 'pending') {
-            $myPendingOrders++;
-        } elseif ($order['status_order'] === 'proses') {
-            $myProcessOrders++;
-        } elseif ($order['status_order'] === 'selesai') {
+        if ($order['status_order'] === 'pending') $myPendingOrders++;
+        elseif ($order['status_order'] === 'proses') $myProcessOrders++;
+        elseif ($order['status_order'] === 'selesai') {
             $myCompletedOrders++;
             $myTotalSpent += $order['harga_snapshot'];
         }
@@ -63,6 +61,11 @@ if ($role !== 'customer') {
         }
     }
 }
+
+// Get user saldo
+$stmt = $db->prepare('SELECT saldo FROM user WHERE id_user = ?');
+$stmt->execute([$userId]);
+$saldo = $stmt->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -123,6 +126,10 @@ tailwind.config = {
                 <span class="material-symbols-outlined">receipt_long</span>
                 <span>History</span>
             </a>
+            <a href="topup.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">wallet</span>
+                <span>Top Up</span>
+            </a>
             <a href="price.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
                 <span class="material-symbols-outlined">price_check</span>
                 <span>Pricing</span>
@@ -134,8 +141,8 @@ tailwind.config = {
             </a>
         <?php elseif ($role === 'supervisor'): ?>
             <a href="supervisor.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
-                <span class="material-symbols-outlined">verified</span>
-                <span>Verify Payments</span>
+                <span class="material-symbols-outlined">dashboard</span>
+                <span>Dashboard</span>
             </a>
             <a href="reports.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
                 <span class="material-symbols-outlined">assessment</span>
@@ -145,6 +152,10 @@ tailwind.config = {
             <a href="admin.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
                 <span class="material-symbols-outlined">dashboard</span>
                 <span>Dashboard</span>
+            </a>
+            <a href="verify_payments.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                <span class="material-symbols-outlined">verified</span>
+                <span>Verifikasi</span>
             </a>
             <a href="reports.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
                 <span class="material-symbols-outlined">assessment</span>
@@ -222,7 +233,20 @@ tailwind.config = {
             </div>
         </div>
 
-        <!-- ========== UNTUK CUSTOMER: MY ORDER STATISTICS ========== -->
+        <!-- Saldo Card (khusus customer) -->
+        <?php if ($role === 'customer'): ?>
+        <div class="bg-gradient-to-r from-primary to-secondary rounded-2xl p-5 text-white shadow-lg mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-white/80 text-sm">Saldo Anda</p>
+                    <p class="text-2xl font-bold mt-1">Rp <?= number_format($saldo, 0, ',', '.') ?></p>
+                </div>
+                <a href="topup.php" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-xl text-sm font-semibold transition">Top Up</a>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- ========== MY ORDER STATISTICS (UNTUK CUSTOMER) ========== -->
         <?php if ($role === 'customer'): ?>
         <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4">My Order Statistics</h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -244,7 +268,6 @@ tailwind.config = {
             </div>
         </div>
 
-        <!-- Additional Stats for Customer -->
         <div class="grid md:grid-cols-2 gap-6 mb-8">
             <div class="stat-card-sky rounded-2xl p-5 text-white shadow-lg">
                 <div class="flex items-center justify-between">
@@ -267,7 +290,7 @@ tailwind.config = {
         </div>
         <?php endif; ?>
 
-        <!-- ========== UNTUK ADMIN/SUPERVISOR/WORKER: SYSTEM OVERVIEW ========== -->
+        <!-- ========== SYSTEM OVERVIEW (UNTUK ADMIN/SUPERVISOR/WORKER) ========== -->
         <?php if ($role !== 'customer'): ?>
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 mb-6">
             <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">

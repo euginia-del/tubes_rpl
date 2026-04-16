@@ -1,49 +1,75 @@
 <?php
 require_once 'common.php';
-require_worker();
+require_admin();
 
 $db = get_db();
 
-// Handle status update
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'], $_POST['new_status'])) {
-    $orderId = $_POST['order_id'];
-    $newStatus = $_POST['new_status'];
-    if (update_order_status($orderId, $newStatus)) {
-        set_flash('success', 'Order #' . $orderId . ' status diubah menjadi ' . $newStatus);
-    } else {
-        set_flash('error', 'Gagal mengubah status order');
-    }
-    header('Location: worker.php');
+// Handle verify payment
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_order_id'])) {
+    $orderId = $_POST['verify_order_id'];
+    
+    // Update payment status
+    $stmt = $db->prepare('UPDATE pembayaran SET status_bayar = "lunas", tanggal_verifikasi = NOW() WHERE id_order = ?');
+    $stmt->execute([$orderId]);
+    
+    // Update order status to proses
+    $stmt = $db->prepare('UPDATE orders SET status_order = "proses" WHERE id_order = ?');
+    $stmt->execute([$orderId]);
+    
+    set_flash('success', 'Pembayaran order #' . $orderId . ' berhasil diverifikasi!');
+    header('Location: verify_payments.php');
     exit;
 }
 
-// Get all orders
+// Handle reject payment
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reject_order_id'])) {
+    $orderId = $_POST['reject_order_id'];
+    $alasan = $_POST['alasan_penolakan'] ?? 'Bukti tidak valid';
+    
+    // Update payment status
+    $stmt = $db->prepare('UPDATE pembayaran SET status_bayar = "gagal", catatan_pembayaran = CONCAT(catatan_pembayaran, " | Ditolak: ", ?) WHERE id_order = ?');
+    $stmt->execute([$alasan, $orderId]);
+    
+    set_flash('error', 'Pembayaran order #' . $orderId . ' ditolak. Alasan: ' . $alasan);
+    header('Location: verify_payments.php');
+    exit;
+}
+
+// Get all pending payments
 $stmt = $db->prepare('
-    SELECT o.*, u.nama as customer_name, l.nama_layanan as service_name 
-    FROM orders o 
-    LEFT JOIN user u ON o.id_user = u.id_user 
-    LEFT JOIN layanan l ON o.id_layanan = l.id_layanan 
-    ORDER BY o.tanggal_order DESC
+    SELECT p.*, o.id_order, o.tanggal_order, o.harga_snapshot, o.berat_cucian, 
+           u.nama as customer_name, u.email, u.no_hp,
+           l.nama_layanan as service_name
+    FROM pembayaran p
+    JOIN orders o ON p.id_order = o.id_order
+    JOIN user u ON o.id_user = u.id_user
+    JOIN layanan l ON o.id_layanan = l.id_layanan
+    WHERE p.status_bayar = "pending"
+    ORDER BY p.tanggal_pembayaran DESC
 ');
 $stmt->execute();
-$allOrders = $stmt->fetchAll();
+$pendingPayments = $stmt->fetchAll();
 
-$pendingOrders = array_filter($allOrders, function($o) { 
-    return $o['status_order'] === 'pending'; 
-});
-$processOrders = array_filter($allOrders, function($o) { 
-    return $o['status_order'] === 'proses'; 
-});
-$completedOrders = array_filter($allOrders, function($o) { 
-    return $o['status_order'] === 'selesai'; 
-});
+// Get all verified payments
+$stmt = $db->prepare('
+    SELECT p.*, o.id_order, o.harga_snapshot,
+           u.nama as customer_name
+    FROM pembayaran p
+    JOIN orders o ON p.id_order = o.id_order
+    JOIN user u ON o.id_user = u.id_user
+    WHERE p.status_bayar != "pending"
+    ORDER BY p.tanggal_pembayaran DESC
+    LIMIT 30
+');
+$stmt->execute();
+$verifiedPayments = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>Worker Dashboard - LaundryApp</title>
+<title>Verifikasi Pembayaran - Admin</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700&display=swap" rel="stylesheet"/>
@@ -53,30 +79,66 @@ tailwind.config = {
     darkMode: "class",
     theme: {
         extend: {
-            colors: { "primary": "#f97316", "secondary": "#ef4444" },
+            colors: { "primary": "#6366f1", "secondary": "#8b5cf6" },
             fontFamily: { "display": ["Inter", "sans-serif"] }
         }
     }
 }
 </script>
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+.modal.active { display: flex; }
+.modal-content { max-width: 500px; width: 90%; }
+</style>
 </head>
-<body class="bg-gradient-to-br from-orange-50 to-red-50 dark:from-slate-900 dark:to-slate-800 min-h-screen pb-20 md:pb-0">
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 min-h-screen pb-20 md:pb-0">
 
 <!-- Desktop Sidebar -->
 <div class="hidden md:flex md:fixed md:inset-y-0 md:left-0 md:w-72 bg-white dark:bg-slate-800 shadow-xl flex-col">
     <div class="flex items-center justify-center p-6 border-b dark:border-slate-700">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
-                <span class="material-symbols-outlined text-white text-xl">handyman</span>
+                <span class="material-symbols-outlined text-white text-xl">local_laundry_service</span>
             </div>
-            <span class="text-xl font-bold text-primary">Worker Panel</span>
+            <span class="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Admin Panel</span>
         </div>
     </div>
     
     <nav class="flex-1 p-4 space-y-2">
-        <a href="worker.php" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary font-semibold">
+        <a href="admin.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
             <span class="material-symbols-outlined">dashboard</span>
             <span>Dashboard</span>
+        </a>
+        <a href="verify_payments.php" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary font-semibold">
+            <span class="material-symbols-outlined">verified</span>
+            <span>Verifikasi Pembayaran</span>
+        </a>
+        <a href="reports.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">assessment</span>
+            <span>Reports</span>
+        </a>
+        <a href="history.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">receipt_long</span>
+            <span>All Orders</span>
+        </a>
+        <a href="price.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">price_check</span>
+            <span>Services</span>
+        </a>
+        <a href="users.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">group</span>
+            <span>Users</span>
         </a>
         <a href="profile.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
             <span class="material-symbols-outlined">account_circle</span>
@@ -87,29 +149,21 @@ tailwind.config = {
     <div class="p-4 border-t dark:border-slate-700">
         <div class="flex items-center gap-3 px-4 py-3">
             <div class="w-10 h-10 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
-                <span class="material-symbols-outlined text-white text-xl">engineering</span>
+                <span class="material-symbols-outlined text-white text-xl">admin_panel_settings</span>
             </div>
             <div class="flex-1">
-                <p class="text-sm font-semibold text-gray-800 dark:text-white">Worker</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Staff Access</p>
+                <p class="text-sm font-semibold text-gray-800 dark:text-white">Administrator</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Full Access</p>
             </div>
             <button id="themeToggle" class="text-xs px-2 py-1 rounded-full border dark:border-slate-600">🌙</button>
         </div>
     </div>
 </div>
 
-<!-- Mobile Header -->
-<div class="md:hidden bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-40">
-    <div class="flex items-center justify-between px-4 py-3">
-        <span class="text-lg font-bold text-primary">Worker Panel</span>
-        <button id="themeToggle" class="text-xs px-3 py-1 rounded-full border dark:border-slate-600">🌙</button>
-    </div>
-</div>
-
 <!-- Main Content -->
 <div class="md:ml-72">
     <div class="container-responsive py-6">
-        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-6">Worker Dashboard</h1>
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-6">Verifikasi Pembayaran</h1>
 
         <?php if ($msg = get_flash('success')): ?>
         <div class="mb-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 rounded-xl p-3">
@@ -123,80 +177,108 @@ tailwind.config = {
         </div>
         <?php endif; ?>
 
-        <!-- Stats -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg">
-                <p class="text-gray-500 dark:text-gray-400 text-sm">Total Orders</p>
-                <p class="text-2xl font-bold text-gray-800 dark:text-white"><?= count($allOrders) ?></p>
+        <!-- Pending Payments -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden mb-8">
+            <div class="px-6 py-4 border-b dark:border-slate-700">
+                <h2 class="text-lg font-bold text-gray-800 dark:text-white">Menunggu Verifikasi (<?= count($pendingPayments) ?>)</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Verifikasi bukti pembayaran dari customer</p>
             </div>
-            <div class="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-5 text-white shadow-lg">
-                <p class="text-amber-100 text-sm">Pending</p>
-                <p class="text-2xl font-bold"><?= count($pendingOrders) ?></p>
-            </div>
-            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-5 text-white shadow-lg">
-                <p class="text-purple-100 text-sm">In Process</p>
-                <p class="text-2xl font-bold"><?= count($processOrders) ?></p>
-            </div>
-            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 text-white shadow-lg">
-                <p class="text-emerald-100 text-sm">Completed</p>
-                <p class="text-2xl font-bold"><?= count($completedOrders) ?></p>
+            
+            <div class="p-6">
+                <?php if (empty($pendingPayments)): ?>
+                <div class="text-center py-12">
+                    <span class="material-symbols-outlined text-6xl text-gray-400">check_circle</span>
+                    <p class="text-gray-500 dark:text-gray-400 mt-4">Tidak ada pembayaran yang menunggu verifikasi</p>
+                </div>
+                <?php else: ?>
+                <div class="space-y-4">
+                    <?php foreach ($pendingPayments as $payment): ?>
+                    <div class="border dark:border-slate-700 rounded-xl p-4 hover:shadow-md transition">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 flex-wrap mb-2">
+                                    <p class="font-bold text-gray-800 dark:text-white text-lg">#<?= $payment['id_order'] ?></p>
+                                    <span class="badge badge-warning">pending</span>
+                                    <span class="badge badge-info text-xs"><?= strtoupper($payment['metode']) ?></span>
+                                </div>
+                                <p class="text-gray-600 dark:text-gray-300">
+                                    <span class="material-symbols-outlined text-sm align-middle">person</span>
+                                    <?= htmlspecialchars($payment['customer_name']) ?>
+                                </p>
+                                <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                                    <?= $payment['service_name'] ?> • <?= $payment['berat_cucian'] ?> kg
+                                </p>
+                                <p class="text-gray-500 dark:text-gray-400 text-sm">
+                                    <span class="material-symbols-outlined text-sm align-middle">schedule</span>
+                                    Tgl Bayar: <?= date('d/m/Y H:i', strtotime($payment['tanggal_pembayaran'])) ?>
+                                </p>
+                                <p class="text-primary font-bold text-xl mt-2">Rp <?= number_format($payment['jumlah_bayar'],0,',','.') ?></p>
+                                
+                                <?php if ($payment['nomor_transaksi']): ?>
+                                <p class="text-xs text-gray-400 mt-1">No. Transaksi: <?= $payment['nomor_transaksi'] ?></p>
+                                <?php endif; ?>
+                                
+                                <?php if ($payment['catatan_pembayaran']): ?>
+                                <p class="text-xs text-gray-500 mt-1 bg-gray-50 dark:bg-slate-700 p-2 rounded-lg">
+                                    📝 Catatan: <?= htmlspecialchars($payment['catatan_pembayaran']) ?>
+                                </p>
+                                <?php endif; ?>
+                                
+                                <?php if ($payment['bukti_pembayaran'] && file_exists($payment['bukti_pembayaran'])): ?>
+                                <div class="mt-2">
+                                    <a href="<?= $payment['bukti_pembayaran'] ?>" target="_blank" class="inline-flex items-center gap-1 text-primary text-sm hover:underline">
+                                        <span class="material-symbols-outlined text-sm">receipt</span>
+                                        Lihat Bukti Pembayaran
+                                    </a>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="openVerifyModal(<?= $payment['id_order'] ?>)" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-xl font-semibold transition">
+                                    ✅ Verifikasi
+                                </button>
+                                <button onclick="openRejectModal(<?= $payment['id_order'] ?>)" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-xl font-semibold transition">
+                                    ❌ Tolak
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 
-        <!-- All Orders Table -->
+        <!-- Riwayat Verifikasi -->
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden">
             <div class="px-6 py-4 border-b dark:border-slate-700">
-                <h2 class="text-lg font-bold text-gray-800 dark:text-white">All Orders</h2>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Click dropdown to change order status</p>
+                <h2 class="text-lg font-bold text-gray-800 dark:text-white">Riwayat Verifikasi</h2>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-gray-50 dark:bg-slate-700">
                         <tr>
-                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">ID</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Customer</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Service</th>
-                            <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Weight</th>
-                            <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Total</th>
-                            <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Status</th>
-                            <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Action</th>
+                            <th class="px-4 py-3 text-left">Order ID</th>
+                            <th class="px-4 py-3 text-left">Customer</th>
+                            <th class="px-4 py-3 text-center">Metode</th>
+                            <th class="px-4 py-3 text-right">Nominal</th>
+                            <th class="px-4 py-3 text-center">Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($allOrders)): ?>
-                        <tr>
-                            <td colspan="7" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                                No orders found
+                        <?php foreach($verifiedPayments as $payment): ?>
+                        <tr class="border-b dark:border-slate-700">
+                            <td class="px-4 py-3">#<?= $payment['id_order'] ?></td>
+                            <td class="px-4 py-3"><?= htmlspecialchars($payment['customer_name']) ?></td>
+                            <td class="px-4 py-3 text-center uppercase"><?= $payment['metode'] ?></td>
+                            <td class="px-4 py-3 text-right text-primary font-semibold">Rp <?= number_format($payment['jumlah_bayar'],0,',','.') ?></td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="badge <?= $payment['status_bayar'] == 'lunas' ? 'badge-success' : 'badge-info' ?>">
+                                    <?= $payment['status_bayar'] == 'lunas' ? 'Terverifikasi' : 'Ditolak' ?>
+                                </span>
                             </td>
                         </tr>
-                        <?php else: ?>
-                            <?php foreach($allOrders as $order): ?>
-                            <tr class="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                                <td class="px-4 py-3 font-medium text-gray-800 dark:text-white">#<?= $order['id_order'] ?></td>
-                                <td class="px-4 py-3 text-gray-600 dark:text-gray-300"><?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?></td>
-                                <td class="px-4 py-3 text-gray-600 dark:text-gray-300"><?= htmlspecialchars($order['service_name'] ?? 'Layanan') ?></td>
-                                <td class="px-4 py-3 text-center text-gray-600 dark:text-gray-300"><?= $order['berat_cucian'] ?> kg</td>
-                                <td class="px-4 py-3 text-right text-primary font-semibold">Rp <?= number_format($order['harga_snapshot'],0,',','.') ?></td>
-                                <td class="px-4 py-3 text-center">
-                                    <span class="badge <?= $order['status_order'] == 'selesai' ? 'badge-success' : ($order['status_order'] == 'proses' ? 'badge-info' : 'badge-warning') ?>">
-                                        <?= $order['status_order'] ?>
-                                    </span>
-                                </td>
-                                <td class="px-4 py-3 text-center">
-                                    <form method="post" class="inline-block">
-                                        <input type="hidden" name="order_id" value="<?= $order['id_order'] ?>">
-                                        <select name="new_status" onchange="this.form.submit()" 
-                                            class="text-sm border rounded-lg px-3 py-1.5 cursor-pointer
-                                            <?= $order['status_order'] == 'selesai' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : ($order['status_order'] == 'proses' ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-amber-50 border-amber-300 text-amber-700') ?>">
-                                            <option value="pending" <?= $order['status_order'] == 'pending' ? 'selected' : '' ?>>Pending</option>
-                                            <option value="proses" <?= $order['status_order'] == 'proses' ? 'selected' : '' ?>>Proses</option>
-                                            <option value="selesai" <?= $order['status_order'] == 'selesai' ? 'selected' : '' ?>>Selesai</option>
-                                        </select>
-                                    </form>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
@@ -204,19 +286,53 @@ tailwind.config = {
     </div>
 </div>
 
-<!-- Mobile Bottom Navigation -->
-<div class="bottom-nav md:hidden">
-    <div class="flex justify-around">
-        <a href="worker.php" class="flex flex-col items-center gap-1 text-primary">
-            <span class="material-symbols-outlined">dashboard</span>
-            <span class="text-xs">Home</span>
-        </a>
-        <a href="profile.php" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400">
-            <span class="material-symbols-outlined">person</span>
-            <span class="text-xs">Profile</span>
-        </a>
+<!-- Modal Verifikasi -->
+<div id="verifyModal" class="modal">
+    <div class="modal-content bg-white dark:bg-slate-800 rounded-2xl p-6">
+        <h3 class="text-xl font-bold mb-4">Konfirmasi Verifikasi</h3>
+        <p class="mb-4">Apakah Anda yakin ingin memverifikasi pembayaran ini?</p>
+        <form method="post">
+            <input type="hidden" name="verify_order_id" id="verifyOrderId">
+            <div class="flex gap-3">
+                <button type="button" onclick="closeVerifyModal()" class="flex-1 bg-gray-200 py-2 rounded-xl">Batal</button>
+                <button type="submit" class="flex-1 bg-emerald-500 text-white py-2 rounded-xl">Ya, Verifikasi</button>
+            </div>
+        </form>
     </div>
 </div>
+
+<!-- Modal Tolak -->
+<div id="rejectModal" class="modal">
+    <div class="modal-content bg-white dark:bg-slate-800 rounded-2xl p-6">
+        <h3 class="text-xl font-bold mb-4">Tolak Pembayaran</h3>
+        <p class="mb-2">Alasan penolakan:</p>
+        <form method="post">
+            <input type="hidden" name="reject_order_id" id="rejectOrderId">
+            <textarea name="alasan_penolakan" rows="3" class="w-full border rounded-xl p-3 mb-4" placeholder="Contoh: Bukti transfer tidak jelas" required></textarea>
+            <div class="flex gap-3">
+                <button type="button" onclick="closeRejectModal()" class="flex-1 bg-gray-200 py-2 rounded-xl">Batal</button>
+                <button type="submit" class="flex-1 bg-red-500 text-white py-2 rounded-xl">Ya, Tolak</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openVerifyModal(orderId) {
+    document.getElementById('verifyOrderId').value = orderId;
+    document.getElementById('verifyModal').classList.add('active');
+}
+function closeVerifyModal() {
+    document.getElementById('verifyModal').classList.remove('active');
+}
+function openRejectModal(orderId) {
+    document.getElementById('rejectOrderId').value = orderId;
+    document.getElementById('rejectModal').classList.add('active');
+}
+function closeRejectModal() {
+    document.getElementById('rejectModal').classList.remove('active');
+}
+</script>
 
 <?= global_route_script() ?>
 </body>

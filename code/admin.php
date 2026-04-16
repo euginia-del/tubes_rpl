@@ -9,6 +9,18 @@ $pending = get_pending_orders_count($db);
 $totalUsers = get_user_count($db);
 $allOrders = get_all_orders($db);
 
+// Get pending payments for admin verification
+$stmt = $db->prepare('
+    SELECT p.*, o.id_order, o.harga_snapshot, u.nama as customer_name
+    FROM pembayaran p
+    JOIN orders o ON p.id_order = o.id_order
+    JOIN user u ON o.id_user = u.id_user
+    WHERE p.status_bayar = "pending"
+    ORDER BY p.tanggal_pembayaran DESC
+');
+$stmt->execute();
+$pendingPayments = $stmt->fetchAll();
+
 // Get recent users
 $stmt = $db->prepare('SELECT * FROM user WHERE role = "customer" ORDER BY id_user DESC LIMIT 5');
 $stmt->execute();
@@ -50,6 +62,22 @@ tailwind.config = {
     }
 }
 </script>
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+.modal.active { display: flex; }
+.modal-content { max-width: 500px; width: 90%; }
+</style>
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 min-h-screen pb-20 md:pb-0">
 
@@ -68,6 +96,10 @@ tailwind.config = {
         <a href="admin.php" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary font-semibold">
             <span class="material-symbols-outlined">dashboard</span>
             <span>Dashboard</span>
+        </a>
+        <a href="verify_payments.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">verified</span>
+            <span>Verifikasi Pembayaran</span>
         </a>
         <a href="reports.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
             <span class="material-symbols-outlined">assessment</span>
@@ -105,19 +137,6 @@ tailwind.config = {
     </div>
 </div>
 
-<!-- Mobile Header -->
-<div class="md:hidden bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-40">
-    <div class="flex items-center justify-between px-4 py-3">
-        <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
-                <span class="material-symbols-outlined text-white text-lg">admin_panel_settings</span>
-            </div>
-            <span class="text-lg font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Admin Panel</span>
-        </div>
-        <button id="themeToggle" class="text-xs px-3 py-1 rounded-full border dark:border-slate-600">🌙</button>
-    </div>
-</div>
-
 <!-- Main Content -->
 <div class="md:ml-72">
     <div class="container-responsive py-6">
@@ -133,7 +152,6 @@ tailwind.config = {
                     </div>
                     <span class="material-symbols-outlined text-3xl text-primary">receipt_long</span>
                 </div>
-                <div class="mt-2 text-xs text-emerald-600">+12% from last month</div>
             </div>
             <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg card-animate">
                 <div class="flex items-center justify-between">
@@ -164,6 +182,20 @@ tailwind.config = {
             </div>
         </div>
 
+        <!-- Pending Payments Alert -->
+        <?php if (count($pendingPayments) > 0): ?>
+        <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 mb-8 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-amber-600">warning</span>
+                <div>
+                    <p class="font-semibold text-amber-800 dark:text-amber-300"><?= count($pendingPayments) ?> Pembayaran Menunggu Verifikasi</p>
+                    <p class="text-sm text-amber-600 dark:text-amber-400">Segera verifikasi pembayaran customer</p>
+                </div>
+            </div>
+            <a href="verify_payments.php" class="bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-600 transition">Verifikasi Sekarang</a>
+        </div>
+        <?php endif; ?>
+
         <!-- Revenue Chart -->
         <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg mb-8">
             <h2 class="text-lg font-bold text-gray-800 dark:text-white mb-4">Revenue Overview (Last 6 Months)</h2>
@@ -172,12 +204,12 @@ tailwind.config = {
 
         <!-- Quick Actions -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <a href="price.php" class="bg-gradient-to-r from-primary to-blue-600 rounded-2xl p-5 text-white shadow-lg hover-lift card-animate">
+            <a href="verify_payments.php" class="bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl p-5 text-white shadow-lg hover-lift card-animate">
                 <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-2xl">payment</span>
+                    <span class="material-symbols-outlined text-2xl">verified</span>
                     <div>
-                        <h3 class="font-bold">Pricing & Services</h3>
-                        <p class="text-sm opacity-90">Manage services & pricing</p>
+                        <h3 class="font-bold">Verifikasi Pembayaran</h3>
+                        <p class="text-sm opacity-90">Verifikasi bukti pembayaran customer</p>
                     </div>
                 </div>
             </a>
@@ -210,9 +242,8 @@ tailwind.config = {
             </a>
         </div>
 
-        <!-- Recent Orders & Users -->
+        <!-- Recent Orders -->
         <div class="grid md:grid-cols-2 gap-6">
-            <!-- Recent Orders -->
             <div>
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-xl font-bold text-gray-800 dark:text-white">Recent Orders</h2>
@@ -226,7 +257,7 @@ tailwind.config = {
                                 <p class="font-bold text-gray-800 dark:text-white">#<?= $order['id_order'] ?></p>
                                 <p class="text-sm text-gray-500 dark:text-gray-400"><?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?></p>
                             </div>
-                            <span class="badge <?= $order['status_order'] == 'selesai' ? 'badge-success' : 'badge-warning' ?>">
+                            <span class="badge <?= $order['status_order'] == 'selesai' ? 'badge-success' : ($order['status_order'] == 'proses' ? 'badge-info' : 'badge-warning') ?>">
                                 <?= $order['status_order'] ?>
                             </span>
                         </div>
@@ -263,30 +294,7 @@ tailwind.config = {
     </div>
 </div>
 
-<!-- Mobile Bottom Navigation -->
-<div class="bottom-nav md:hidden">
-    <div class="flex justify-around">
-        <a href="admin.php" class="flex flex-col items-center gap-1 text-primary">
-            <span class="material-symbols-outlined">dashboard</span>
-            <span class="text-xs">Home</span>
-        </a>
-        <a href="reports.php" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400">
-            <span class="material-symbols-outlined">assessment</span>
-            <span class="text-xs">Reports</span>
-        </a>
-        <a href="history.php" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400">
-            <span class="material-symbols-outlined">receipt_long</span>
-            <span class="text-xs">Orders</span>
-        </a>
-        <a href="profile.php" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400">
-            <span class="material-symbols-outlined">person</span>
-            <span class="text-xs">Profile</span>
-        </a>
-    </div>
-</div>
-
 <script>
-// Revenue Chart
 const ctx = document.getElementById('revenueChart').getContext('2d');
 const revenueData = <?php 
     $revData = array_fill(0, 6, 0);
