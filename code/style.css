@@ -1,4 +1,4 @@
-/* style.css - LaundryApp Theme */
+/* style.css - LaundryApp Complete Theme */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 * {
@@ -14,17 +14,7 @@ body {
   min-height: 100vh;
 }
 
-/* ========== BACKGROUND LAUNDRY THEME ========== */
-.laundry-bg {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -2;
-}
-
-/* Gradient Background */
+/* ========== BACKGROUND GRADIENT ========== */
 .bg-gradient-main {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
   background-size: 200% 200%;
@@ -37,7 +27,7 @@ body {
   100% { background-position: 0% 50%; }
 }
 
-/* Laundry Pattern SVG */
+/* ========== LAUNDRY PATTERN BACKGROUND ========== */
 .laundry-pattern {
   position: fixed;
   top: 0;
@@ -48,41 +38,97 @@ body {
   background-repeat: repeat;
   background-size: 60px;
   pointer-events: none;
-  z-index: -1;
+  z-index: 0;
 }
 
-/* Bubbles Animation */
-.bubbles {
+/* ========== BUBBLES ANIMATION ========== */
+.bubbles-container {
   position: fixed;
   bottom: 0;
   left: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: -1;
+  z-index: 0;
   overflow: hidden;
 }
 
 .bubble {
   position: absolute;
   bottom: -50px;
-  background: rgba(255, 255, 255, 0.15);
+  background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%);
   border-radius: 50%;
   animation: rise 15s infinite ease-in;
+  box-shadow: 0 0 10px rgba(255,255,255,0.3);
 }
 
 @keyframes rise {
   0% {
     bottom: -50px;
-    transform: translateX(0);
+    transform: translateX(0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
   }
   50% {
-    transform: translateX(20px);
+    transform: translateX(20px) scale(1.1);
+  }
+  90% {
+    opacity: 0.3;
   }
   100% {
     bottom: 100%;
-    transform: translateX(-20px);
+    transform: translateX(-20px) scale(1.5);
+    opacity: 0;
   }
+}
+
+.bubble-small { width: 30px; height: 30px; }
+.bubble-medium { width: 50px; height: 50px; }
+.bubble-large { width: 80px; height: 80px; }
+.bubble-xl { width: 120px; height: 120px; }
+
+/* ========== FLOATING SOAP ICON ========== */
+.soap-icon {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 55px;
+  height: 55px;
+  background: linear-gradient(135deg, #fff, #e0e0e0);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  animation: float 3s ease-in-out infinite;
+  cursor: pointer;
+  z-index: 100;
+  transition: transform 0.3s ease;
+}
+
+.soap-icon:hover {
+  transform: scale(1.1);
+}
+
+.soap-icon span {
+  font-size: 28px;
+  color: #6366f1;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.dark .soap-icon {
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+.dark .soap-icon span {
+  color: #818cf8;
 }
 
 /* ========== ANIMATIONS ========== */
@@ -101,27 +147,16 @@ body {
   to { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-15px) rotate(5deg); }
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.05); }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -1000px 0; }
-  100% { background-position: 1000px 0; }
-}
-
-/* Animation Classes */
 .fade-in-up {
   animation: fadeInUp 0.6s ease forwards;
   opacity: 0;
@@ -137,11 +172,12 @@ body {
   opacity: 0;
 }
 
-.float-animation {
-  animation: float 4s ease-in-out infinite;
+.scale-in {
+  animation: scaleIn 0.4s ease forwards;
+  opacity: 0;
 }
 
-.pulse-animation {
+.pulse {
   animation: pulse 2s ease-in-out infinite;
 }
 
@@ -173,14 +209,14 @@ body {
 
 /* ========== GLASSMORPHISM ========== */
 .glass-card {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 1.5rem;
 }
 
 .dark .glass-card {
-  background: rgba(30, 41, 59, 0.9);
+  background: rgba(30, 41, 59, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -206,7 +242,6 @@ body {
 .dark .badge-info { background: linear-gradient(135deg, #1e3a5f, #1e40af); color: #60a5fa; }
 .dark .badge-success { background: linear-gradient(135deg, #064e3b, #065f46); color: #34d399; }
 .dark .badge-secondary { background: linear-gradient(135deg, #4c1d95, #5b21b6); color: #c4b5fd; }
-.dark .badge-primary { background: linear-gradient(135deg, #312e81, #3730a3); color: #a5b4fc; }
 
 /* ========== CUSTOM SCROLLBAR ========== */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -273,6 +308,11 @@ body {
   border-top-color: #6366f1;
   border-radius: 50%;
   animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* ========== CARD STYLES ========== */
@@ -359,10 +399,6 @@ body {
   color: #94a3b8 !important;
 }
 
-.dark .text-gray-700 {
-  color: #cbd5e1 !important;
-}
-
 .dark .border-gray-200,
 .dark .border-gray-300 {
   border-color: #334155 !important;
@@ -411,20 +447,62 @@ body {
   display: inline-block;
 }
 
-/* ========== WAVE DIVIDER ========== */
-.wave-divider {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  overflow: hidden;
-  line-height: 0;
-  transform: rotate(180deg);
+/* ========== WELCOME SECTION ========== */
+.welcome-section {
+  background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1));
+  border-radius: 1.5rem;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
 }
 
-.wave-divider svg {
+/* ========== STATS CARD HOVER ========== */
+.stat-card {
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
+  filter: brightness(1.05);
+}
+
+/* ========== SIDEBAR STYLES ========== */
+.sidebar-link {
+  transition: all 0.3s ease;
   position: relative;
-  display: block;
-  width: calc(100% + 1.3px);
-  height: 50px;
+  overflow: hidden;
+}
+
+.sidebar-link::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 100%;
+  background: rgba(99, 102, 241, 0.1);
+  transition: width 0.3s ease;
+  z-index: -1;
+}
+
+.sidebar-link:hover::before {
+  width: 100%;
+}
+
+/* ========== TABLE STYLES ========== */
+.table-modern {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table-modern th {
+  background: rgba(99, 102, 241, 0.1);
+  font-weight: 600;
+}
+
+.table-modern tr {
+  transition: all 0.3s ease;
+}
+
+.table-modern tr:hover {
+  background: rgba(99, 102, 241, 0.05);
 }

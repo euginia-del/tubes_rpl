@@ -302,42 +302,214 @@ function registerUser($nama, $email, $password, $no_hp, $alamat) {
 // ========== UI FUNCTIONS ==========
 function global_route_script() {
     echo '
-<script>
-(function() {
-  const html = document.documentElement;
-  const toggleBtns = document.querySelectorAll("#themeToggle");
-  const isDark = localStorage.theme === "dark" || (!localStorage.theme && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  
-  if (isDark) html.classList.add("dark");
-  
-  toggleBtns.forEach(btn => {
-    btn.innerHTML = isDark ? "☀️ Light" : "🌙 Dark";
-    btn.onclick = function() {
-      html.classList.toggle("dark");
-      localStorage.theme = html.classList.contains("dark") ? "dark" : "light";
-      document.querySelectorAll("#themeToggle").forEach(b => {
-        b.innerHTML = localStorage.theme === "dark" ? "☀️ Light" : "🌙 Dark";
-      });
-    };
-  });
+<!-- Bubbles Container -->
+<div class="bubbles-container" id="bubblesContainer"></div>
+<div class="soap-icon" id="soapIcon">
+    <span class="material-symbols-outlined">soap</span>
+</div>
 
-  document.querySelectorAll(".card-animate").forEach((el, i) => {
-    el.style.animationDelay = `${i * 0.1}s`;
-    el.classList.add("fade-in-up");
-  });
-})();
+<script>
+// ========== CREATE BUBBLES ANIMATION ==========
+function createBubbles() {
+    const container = document.getElementById("bubblesContainer");
+    if (!container) return;
+    
+    const bubbleSizes = ["bubble-small", "bubble-medium", "bubble-large", "bubble-xl"];
+    const bubbleCount = 50;
+    
+    for (let i = 0; i < bubbleCount; i++) {
+        const bubble = document.createElement("div");
+        const sizeClass = bubbleSizes[Math.floor(Math.random() * bubbleSizes.length)];
+        bubble.classList.add("bubble", sizeClass);
+        
+        bubble.style.left = Math.random() * 100 + "%";
+        const duration = Math.random() * 15 + 8;
+        bubble.style.animationDuration = duration + "s";
+        bubble.style.animationDelay = Math.random() * 20 + "s";
+        bubble.style.opacity = Math.random() * 0.4 + 0.1;
+        
+        container.appendChild(bubble);
+    }
+}
+
+// ========== SOAP ICON CLICK EFFECT ==========
+function initSoapIcon() {
+    const soapIcon = document.getElementById("soapIcon");
+    if (soapIcon) {
+        soapIcon.addEventListener("click", function() {
+            // Create ripple effect
+            const ripple = document.createElement("div");
+            ripple.style.position = "fixed";
+            ripple.style.bottom = "70px";
+            ripple.style.right = "70px";
+            ripple.style.width = "10px";
+            ripple.style.height = "10px";
+            ripple.style.borderRadius = "50%";
+            ripple.style.background = "radial-gradient(circle, rgba(99,102,241,0.5) 0%, rgba(139,92,246,0) 70%)";
+            ripple.style.pointerEvents = "none";
+            ripple.style.zIndex = "99";
+            ripple.style.animation = "scaleIn 0.5s ease-out forwards";
+            document.body.appendChild(ripple);
+            
+            setTimeout(() => {
+                ripple.remove();
+            }, 500);
+            
+            // Create temporary bubble
+            for(let i = 0; i < 5; i++) {
+                const tempBubble = document.createElement("div");
+                tempBubble.classList.add("bubble", "bubble-small");
+                tempBubble.style.left = (Math.random() * 100) + "%";
+                tempBubble.style.bottom = "20px";
+                tempBubble.style.position = "fixed";
+                tempBubble.style.animation = "rise 2s ease-in-out";
+                document.body.appendChild(tempBubble);
+                setTimeout(() => tempBubble.remove(), 2000);
+            }
+        });
+    }
+}
+
+// ========== DARK MODE TOGGLE ==========
+function initDarkMode() {
+    const html = document.documentElement;
+    const toggleBtns = document.querySelectorAll("#themeToggle");
+    const isDark = localStorage.theme === "dark" || (!localStorage.theme && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    
+    if (isDark) {
+        html.classList.add("dark");
+    }
+    
+    toggleBtns.forEach(btn => {
+        btn.innerHTML = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+        btn.classList.add("px-3", "py-1.5", "rounded-full", "text-sm", "font-semibold", "transition-all", "duration-300", "shadow-md");
+        
+        if (isDark) {
+            btn.classList.add("bg-gray-700", "text-white", "hover:bg-gray-600");
+        } else {
+            btn.classList.add("bg-gray-200", "text-gray-800", "hover:bg-gray-300");
+        }
+        
+        btn.onclick = function() {
+            html.classList.toggle("dark");
+            const newIsDark = html.classList.contains("dark");
+            localStorage.theme = newIsDark ? "dark" : "light";
+            
+            document.querySelectorAll("#themeToggle").forEach(b => {
+                b.innerHTML = newIsDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+                if (newIsDark) {
+                    b.classList.remove("bg-gray-200", "text-gray-800", "hover:bg-gray-300");
+                    b.classList.add("bg-gray-700", "text-white", "hover:bg-gray-600");
+                } else {
+                    b.classList.remove("bg-gray-700", "text-white", "hover:bg-gray-600");
+                    b.classList.add("bg-gray-200", "text-gray-800", "hover:bg-gray-300");
+                }
+            });
+        };
+    });
+}
+
+// ========== SCROLL ANIMATION ==========
+function initScrollAnimation() {
+    const observerOptions = { threshold: 0.1, rootMargin: "0px 0px -50px 0px" };
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add("fade-in-up");
+                observer.unobserve(entry.target);
+            }
+        });
+    }, observerOptions);
+    
+    document.querySelectorAll(".card-animate, .stat-card, .service-card").forEach(el => {
+        observer.observe(el);
+    });
+}
+
+// ========== TOAST NOTIFICATION ==========
+function showToast(message, type = "success") {
+    const toast = document.createElement("div");
+    toast.className = `toast ${type === "success" ? "bg-emerald-500" : "bg-red-500"} text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-2`;
+    toast.innerHTML = `<span class="material-symbols-outlined">${type === "success" ? "check_circle" : "error"}</span> ${message}`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// ========== INITIALIZE ALL ==========
+document.addEventListener("DOMContentLoaded", function() {
+    createBubbles();
+    initSoapIcon();
+    initDarkMode();
+    initScrollAnimation();
+});
 </script>
+
 <style>
+/* Additional styles for animations */
+@keyframes scaleIn {
+    from { transform: scale(1); opacity: 1; }
+    to { transform: scale(20); opacity: 0; }
+}
+
 .fade-in-up {
-  animation: fadeInUp 0.5s ease forwards;
-  opacity: 0;
+    animation: fadeInUp 0.5s ease forwards;
+    opacity: 0;
 }
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
 }
-.card-animate {
-  opacity: 0;
+.card-animate, .stat-card, .service-card {
+    opacity: 0;
+}
+
+/* Button hover effects */
+.btn-hover-effect {
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-hover-effect::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.5s, height 0.5s;
+}
+
+.btn-hover-effect:active::after {
+    width: 200px;
+    height: 200px;
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(5px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
 }
 </style>';
 }
