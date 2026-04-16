@@ -15,10 +15,7 @@ $db = get_db();
 $role = $user['role'];
 $userId = $user['id_user'];
 
-// ========== MY ORDER STATISTICS (HANYA UNTUK CUSTOMER DAN WORKER/SUPERVISOR) ==========
-// Admin TIDAK perlu My Order Statistics
-$showMyOrderStats = ($role === 'customer' || $role === 'worker' || $role === 'supervisor');
-
+// ========== MY ORDER STATISTICS (HANYA UNTUK CUSTOMER) ==========
 $myTotalOrders = 0;
 $myPendingOrders = 0;
 $myProcessOrders = 0;
@@ -26,7 +23,7 @@ $myCompletedOrders = 0;
 $myTotalSpent = 0;
 $myActiveOrders = 0;
 
-if ($showMyOrderStats) {
+if ($role === 'customer') {
     $stmt = $db->prepare('SELECT * FROM orders WHERE id_user = ? ORDER BY tanggal_order DESC');
     $stmt->execute([$userId]);
     $myOrders = $stmt->fetchAll();
@@ -45,8 +42,7 @@ if ($showMyOrderStats) {
     $myActiveOrders = $myPendingOrders + $myProcessOrders;
 }
 
-// ========== SYSTEM OVERVIEW (UNTUK ADMIN/SUPERVISOR/WORKER) ==========
-// Customer TIDAK perlu System Overview
+// ========== SYSTEM OVERVIEW (UNTUK ADMIN/SUPERVISOR/WORKER SAJA) ==========
 $showSystemOverview = ($role !== 'customer');
 
 $allTotalOrders = 0;
@@ -257,8 +253,8 @@ tailwind.config = {
         </div>
         <?php endif; ?>
 
-        <!-- ========== MY ORDER STATISTICS (UNTUK CUSTOMER, WORKER, SUPERVISOR SAJA) ========== -->
-        <?php if ($showMyOrderStats): ?>
+        <!-- ========== MY ORDER STATISTICS (HANYA UNTUK CUSTOMER) ========== -->
+        <?php if ($role === 'customer'): ?>
         <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4">My Order Statistics</h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div class="stat-card-blue rounded-2xl p-5 text-white shadow-lg transform transition hover:scale-105">
@@ -301,7 +297,7 @@ tailwind.config = {
         </div>
         <?php endif; ?>
 
-        <!-- ========== SYSTEM OVERVIEW (UNTUK ADMIN/SUPERVISOR/WORKER) ========== -->
+        <!-- ========== SYSTEM OVERVIEW (UNTUK ADMIN/SUPERVISOR/WORKER SAJA) ========== -->
         <?php if ($showSystemOverview): ?>
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 mb-6">
             <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
