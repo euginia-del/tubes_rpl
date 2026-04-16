@@ -13,35 +13,46 @@ if (isset($_POST['logout'])) {
 
 $db = get_db();
 $role = $user['role'];
+$userId = $user['id_user'];
 
-// Get all orders for this user
+// ========== UNTUK USER SENDIRI (ORDERS MILIKNYA) ==========
 $stmt = $db->prepare('SELECT * FROM orders WHERE id_user = ? ORDER BY tanggal_order DESC');
-$stmt->execute([$user['id_user']]);
-$allUserOrders = $stmt->fetchAll();
+$stmt->execute([$userId]);
+$myOrders = $stmt->fetchAll();
 
-// Calculate stats
-$totalOrders = count($allUserOrders);
-$pendingOrders = count(array_filter($allUserOrders, fn($o) => $o['status_order'] === 'pending'));
-$processOrders = count(array_filter($allUserOrders, fn($o) => $o['status_order'] === 'proses'));
-$completedOrders = count(array_filter($allUserOrders, fn($o) => $o['status_order'] === 'selesai'));
-$activeOrders = $pendingOrders + $processOrders;
-$totalSpent = array_sum(array_column(array_filter($allUserOrders, fn($o) => $o['status_order'] === 'selesai'), 'harga_snapshot'));
+$myTotalOrders = count($myOrders);
+$myPendingOrders = 0;
+$myProcessOrders = 0;
+$myCompletedOrders = 0;
+$myTotalSpent = 0;
 
-// For worker/supervisor/admin - get all orders stats
-if ($role !== 'customer') {
-    if ($role === 'worker') {
-        $stmt = $db->query('SELECT * FROM orders ORDER BY tanggal_order DESC');
-    } elseif ($role === 'supervisor') {
-        $stmt = $db->query('SELECT * FROM orders ORDER BY tanggal_order DESC');
-    } else {
-        $stmt = $db->query('SELECT * FROM orders ORDER BY tanggal_order DESC');
+foreach ($myOrders as $order) {
+    if ($order['status_order'] === 'pending') $myPendingOrders++;
+    elseif ($order['status_order'] === 'proses') $myProcessOrders++;
+    elseif ($order['status_order'] === 'selesai') {
+        $myCompletedOrders++;
+        $myTotalSpent += $order['harga_snapshot'];
     }
-    $allOrders = $stmt->fetchAll();
-    $allTotalOrders = count($allOrders);
-    $allPendingOrders = count(array_filter($allOrders, fn($o) => $o['status_order'] === 'pending'));
-    $allProcessOrders = count(array_filter($allOrders, fn($o) => $o['status_order'] === 'proses'));
-    $allCompletedOrders = count(array_filter($allOrders, fn($o) => $o['status_order'] === 'selesai'));
-    $allTotalRevenue = array_sum(array_column($allOrders, 'harga_snapshot'));
+}
+$myActiveOrders = $myPendingOrders + $myProcessOrders;
+
+// ========== UNTUK SYSTEM OVERVIEW (SEMUA ORDER) ==========
+$stmt = $db->query('SELECT * FROM orders ORDER BY tanggal_order DESC');
+$allOrders = $stmt->fetchAll();
+
+$allTotalOrders = count($allOrders);
+$allPendingOrders = 0;
+$allProcessOrders = 0;
+$allCompletedOrders = 0;
+$allTotalRevenue = 0;
+
+foreach ($allOrders as $order) {
+    if ($order['status_order'] === 'pending') $allPendingOrders++;
+    elseif ($order['status_order'] === 'proses') $allProcessOrders++;
+    elseif ($order['status_order'] === 'selesai') {
+        $allCompletedOrders++;
+        $allTotalRevenue += $order['harga_snapshot'];
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -65,6 +76,27 @@ tailwind.config = {
     }
 }
 </script>
+<style>
+/* Warna-warni untuk stats card */
+.stat-card-blue {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+.stat-card-amber {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+.stat-card-purple {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+.stat-card-emerald {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+.stat-card-sky {
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+}
+.stat-card-rose {
+    background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+}
+</style>
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 min-h-screen pb-20 md:pb-0">
 
@@ -194,78 +226,79 @@ tailwind.config = {
             </div>
         </div>
 
-        <!-- Order Statistics -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg">
+        <!-- MY ORDERS STATISTICS (WARNA-WARNI) -->
+        <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4">My Order Statistics</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="stat-card-blue rounded-2xl p-5 text-white shadow-lg transform transition hover:scale-105">
                 <p class="text-blue-100 text-sm">Total Orders</p>
-                <p class="text-2xl font-bold"><?= $totalOrders ?></p>
+                <p class="text-3xl font-bold"><?= $myTotalOrders ?></p>
             </div>
-            <div class="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-4 text-white shadow-lg">
+            <div class="stat-card-amber rounded-2xl p-5 text-white shadow-lg transform transition hover:scale-105">
                 <p class="text-amber-100 text-sm">Pending</p>
-                <p class="text-2xl font-bold"><?= $pendingOrders ?></p>
+                <p class="text-3xl font-bold"><?= $myPendingOrders ?></p>
             </div>
-            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
+            <div class="stat-card-purple rounded-2xl p-5 text-white shadow-lg transform transition hover:scale-105">
                 <p class="text-purple-100 text-sm">In Process</p>
-                <p class="text-2xl font-bold"><?= $processOrders ?></p>
+                <p class="text-3xl font-bold"><?= $myProcessOrders ?></p>
             </div>
-            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-4 text-white shadow-lg">
+            <div class="stat-card-emerald rounded-2xl p-5 text-white shadow-lg transform transition hover:scale-105">
                 <p class="text-emerald-100 text-sm">Completed</p>
-                <p class="text-2xl font-bold"><?= $completedOrders ?></p>
+                <p class="text-3xl font-bold"><?= $myCompletedOrders ?></p>
             </div>
         </div>
 
         <!-- Additional Stats -->
-        <div class="grid md:grid-cols-2 gap-6 mb-6">
-            <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-primary text-3xl">payments</span>
+        <div class="grid md:grid-cols-2 gap-6 mb-8">
+            <div class="stat-card-sky rounded-2xl p-5 text-white shadow-lg">
+                <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-gray-500 dark:text-gray-400 text-sm">Total Spent</p>
-                        <p class="text-2xl font-bold text-primary">Rp <?= number_format($totalSpent, 0, ',', '.') ?></p>
+                        <p class="text-sky-100 text-sm">Total Spent</p>
+                        <p class="text-2xl font-bold">Rp <?= number_format($myTotalSpent, 0, ',', '.') ?></p>
                     </div>
+                    <span class="material-symbols-outlined text-4xl text-white/30">payments</span>
                 </div>
             </div>
-            <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-primary text-3xl">local_shipping</span>
+            <div class="stat-card-rose rounded-2xl p-5 text-white shadow-lg">
+                <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-gray-500 dark:text-gray-400 text-sm">Active Orders</p>
-                        <p class="text-2xl font-bold text-primary"><?= $activeOrders ?></p>
+                        <p class="text-rose-100 text-sm">Active Orders</p>
+                        <p class="text-2xl font-bold"><?= $myActiveOrders ?></p>
                     </div>
+                    <span class="material-symbols-outlined text-4xl text-white/30">local_shipping</span>
                 </div>
             </div>
         </div>
 
-        <!-- For Worker/Supervisor/Admin - System Overview -->
+        <!-- SYSTEM OVERVIEW (untuk Worker/Supervisor/Admin) -->
         <?php if ($role !== 'customer'): ?>
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 mb-6">
             <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                 <span class="material-symbols-outlined text-primary">insights</span>
-                System Overview
+                System Overview (All Orders)
             </h3>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="text-center p-3 bg-gray-50 dark:bg-slate-700 rounded-xl">
-                    <p class="text-2xl font-bold text-primary"><?= $allTotalOrders ?? 0 ?></p>
-                    <p class="text-sm text-gray-500">Total Orders</p>
+                <div class="text-center p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl text-white">
+                    <p class="text-3xl font-bold"><?= $allTotalOrders ?></p>
+                    <p class="text-sm text-blue-100">Total Orders</p>
                 </div>
-                <div class="text-center p-3 bg-gray-50 dark:bg-slate-700 rounded-xl">
-                    <p class="text-2xl font-bold text-amber-500"><?= $allPendingOrders ?? 0 ?></p>
-                    <p class="text-sm text-gray-500">Pending</p>
+                <div class="text-center p-4 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl text-white">
+                    <p class="text-3xl font-bold"><?= $allPendingOrders ?></p>
+                    <p class="text-sm text-amber-100">Pending</p>
                 </div>
-                <div class="text-center p-3 bg-gray-50 dark:bg-slate-700 rounded-xl">
-                    <p class="text-2xl font-bold text-purple-500"><?= $allProcessOrders ?? 0 ?></p>
-                    <p class="text-sm text-gray-500">In Process</p>
+                <div class="text-center p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl text-white">
+                    <p class="text-3xl font-bold"><?= $allProcessOrders ?></p>
+                    <p class="text-sm text-purple-100">In Process</p>
                 </div>
-                <div class="text-center p-3 bg-gray-50 dark:bg-slate-700 rounded-xl">
-                    <p class="text-2xl font-bold text-emerald-500"><?= $allCompletedOrders ?? 0 ?></p>
-                    <p class="text-sm text-gray-500">Completed</p>
+                <div class="text-center p-4 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl text-white">
+                    <p class="text-3xl font-bold"><?= $allCompletedOrders ?></p>
+                    <p class="text-sm text-emerald-100">Completed</p>
                 </div>
             </div>
             <?php if ($role === 'admin' || $role === 'supervisor'): ?>
-            <div class="mt-4 p-3 bg-primary/10 rounded-xl">
+            <div class="mt-4 p-4 bg-gradient-to-r from-primary to-secondary rounded-xl text-white">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold">Total Revenue</span>
-                    <span class="text-xl font-bold text-primary">Rp <?= number_format($allTotalRevenue ?? 0, 0, ',', '.') ?></span>
+                    <span class="font-semibold">Total Revenue (All Orders)</span>
+                    <span class="text-2xl font-bold">Rp <?= number_format($allTotalRevenue, 0, ',', '.') ?></span>
                 </div>
             </div>
             <?php endif; ?>
