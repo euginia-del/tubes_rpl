@@ -14,13 +14,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nama'], $_POST['email
     $no_hp = trim($_POST['no_hp']);
     $alamat = trim($_POST['alamat']);
     
+    // Cek email sudah terdaftar
     $stmt = $db->prepare('SELECT COUNT(*) FROM user WHERE email = ?');
     $stmt->execute([$email]);
     if ($stmt->fetchColumn() > 0) {
         set_flash('error', 'Email sudah terdaftar.');
     } else {
-        $stmt = $db->prepare('INSERT INTO user (nama, email, password, no_hp, alamat, role) VALUES (?, ?, ?, ?, ?, "customer")');
-        if ($stmt->execute([$nama, $email, $password, $no_hp, $alamat])) {
+        // Hash password dengan SHA256
+        $hashed_password = hash('sha256', $password);
+        
+        $stmt = $db->prepare('INSERT INTO user (nama, email, password, no_hp, alamat, role, saldo) VALUES (?, ?, ?, ?, ?, "customer", 0)');
+        if ($stmt->execute([$nama, $email, $hashed_password, $no_hp, $alamat])) {
             set_flash('success', 'Akun berhasil dibuat. Silakan login.');
             header('Location: login.php');
             exit;
@@ -82,12 +86,18 @@ tailwind.config = {
             </div>
             <?php endif; ?>
 
+            <?php if ($success = get_flash('success')): ?>
+            <div class="mb-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3">
+                <p class="text-emerald-700 dark:text-emerald-300 text-sm"><?= htmlspecialchars($success) ?></p>
+            </div>
+            <?php endif; ?>
+
             <form method="post" class="space-y-4">
                 <div>
                     <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Full Name</label>
                     <div class="relative mt-1">
                         <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">person</span>
-                        <input name="nama" type="text" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary" placeholder="Your full name" required/>
+                        <input name="nama" type="text" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Your full name" required/>
                     </div>
                 </div>
 
@@ -95,7 +105,7 @@ tailwind.config = {
                     <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Email Address</label>
                     <div class="relative mt-1">
                         <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">mail</span>
-                        <input name="email" type="email" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary" placeholder="your@email.com" required/>
+                        <input name="email" type="email" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="your@email.com" required/>
                     </div>
                 </div>
 
@@ -103,7 +113,7 @@ tailwind.config = {
                     <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Phone Number</label>
                     <div class="relative mt-1">
                         <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">call</span>
-                        <input name="no_hp" type="tel" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary" placeholder="08123456789" required/>
+                        <input name="no_hp" type="tel" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="08123456789" required/>
                     </div>
                 </div>
 
@@ -111,7 +121,7 @@ tailwind.config = {
                     <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Address</label>
                     <div class="relative mt-1">
                         <span class="material-symbols-outlined absolute left-3 top-3 text-gray-400">home</span>
-                        <textarea name="alamat" rows="2" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary" placeholder="Your complete address" required></textarea>
+                        <textarea name="alamat" rows="2" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Your complete address" required></textarea>
                     </div>
                 </div>
 
@@ -119,8 +129,9 @@ tailwind.config = {
                     <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Password</label>
                     <div class="relative mt-1">
                         <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">lock</span>
-                        <input name="password" type="password" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary" placeholder="••••••••" required/>
+                        <input name="password" type="password" class="w-full border border-gray-200 dark:border-slate-600 rounded-xl pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="••••••••" required/>
                     </div>
+                    <p class="text-xs text-gray-400 mt-1">Minimal 6 karakter</p>
                 </div>
 
                 <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark text-white font-bold py-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 mt-6">

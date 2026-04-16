@@ -21,19 +21,26 @@ if (isset($_GET['delete'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
         if ($_POST['action'] === 'add') {
+            // Hash password untuk user baru
+            $hashed_password = hash('sha256', $_POST['password']);
             $stmt = $db->prepare('INSERT INTO user (nama, email, password, no_hp, alamat, role) VALUES (?, ?, ?, ?, ?, ?)');
-            if ($stmt->execute([$_POST['nama'], $_POST['email'], $_POST['password'], $_POST['no_hp'], $_POST['alamat'], $_POST['role']])) {
+            if ($stmt->execute([$_POST['nama'], $_POST['email'], $hashed_password, $_POST['no_hp'], $_POST['alamat'], $_POST['role']])) {
                 $message = 'User berhasil ditambahkan';
             } else {
                 $error = 'Gagal menambahkan user';
             }
         } elseif ($_POST['action'] === 'edit') {
-            $stmt = $db->prepare('UPDATE user SET nama = ?, email = ?, no_hp = ?, alamat = ?, role = ? WHERE id_user = ?');
-            if ($stmt->execute([$_POST['nama'], $_POST['email'], $_POST['no_hp'], $_POST['alamat'], $_POST['role'], $_POST['id_user']])) {
-                $message = 'User berhasil diupdate';
+            // Jika password diisi, update password dengan hash
+            if (!empty($_POST['password'])) {
+                $hashed_password = hash('sha256', $_POST['password']);
+                $stmt = $db->prepare('UPDATE user SET nama = ?, email = ?, password = ?, no_hp = ?, alamat = ?, role = ? WHERE id_user = ?');
+                $stmt->execute([$_POST['nama'], $_POST['email'], $hashed_password, $_POST['no_hp'], $_POST['alamat'], $_POST['role'], $_POST['id_user']]);
             } else {
-                $error = 'Gagal mengupdate user';
+                // Update tanpa mengubah password
+                $stmt = $db->prepare('UPDATE user SET nama = ?, email = ?, no_hp = ?, alamat = ?, role = ? WHERE id_user = ?');
+                $stmt->execute([$_POST['nama'], $_POST['email'], $_POST['no_hp'], $_POST['alamat'], $_POST['role'], $_POST['id_user']]);
             }
+            $message = 'User berhasil diupdate';
         }
     }
 }
@@ -67,6 +74,22 @@ tailwind.config = {
     }
 }
 </script>
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+.modal.active { display: flex; }
+.modal-content { max-width: 500px; width: 90%; }
+</style>
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 min-h-screen pb-20 md:pb-0">
 
@@ -85,6 +108,10 @@ tailwind.config = {
         <a href="admin.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
             <span class="material-symbols-outlined">dashboard</span>
             <span>Dashboard</span>
+        </a>
+        <a href="verify_payments.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">verified</span>
+            <span>Verifikasi Pembayaran</span>
         </a>
         <a href="reports.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
             <span class="material-symbols-outlined">assessment</span>
@@ -183,7 +210,7 @@ tailwind.config = {
                             </td>
                             <td class="px-4 py-3 text-center">
                                 <div class="flex items-center justify-center gap-2">
-                                    <button onclick="editUser(<?= htmlspecialchars(json_encode($user)) ?>)" class="text-primary hover:text-primary-dark">
+                                    <button onclick='editUser(<?= json_encode($user) ?>)' class="text-primary hover:text-primary-dark">
                                         <span class="material-symbols-outlined text-sm">edit</span>
                                     </button>
                                     <?php if($user['role'] != 'admin'): ?>
@@ -203,13 +230,13 @@ tailwind.config = {
 </div>
 
 <!-- Add/Edit Modal -->
-<div id="userModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
-    <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md">
+<div id="userModal" class="modal">
+    <div class="modal-content bg-white dark:bg-slate-800 rounded-2xl p-6">
         <div class="flex justify-between items-center mb-4">
             <h2 id="modalTitle" class="text-xl font-bold text-gray-800 dark:text-white">Add User</h2>
-            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
         </div>
-        <form method="POST">
+        <form method="POST" id="userForm">
             <input type="hidden" name="action" id="formAction">
             <input type="hidden" name="id_user" id="userId">
             <div class="space-y-3">
@@ -223,7 +250,8 @@ tailwind.config = {
                 </div>
                 <div>
                     <label class="text-sm font-semibold">Password</label>
-                    <input type="text" name="password" id="userPassword" class="w-full border rounded-xl p-2 mt-1 dark:bg-slate-700" placeholder="Min 6 karakter">
+                    <input type="password" name="password" id="userPassword" class="w-full border rounded-xl p-2 mt-1 dark:bg-slate-700" placeholder="Min 6 karakter (kosongkan jika tidak diubah)">
+                    <p class="text-xs text-gray-400 mt-1">Minimal 6 karakter</p>
                 </div>
                 <div>
                     <label class="text-sm font-semibold">Phone</label>
@@ -242,7 +270,7 @@ tailwind.config = {
                         <option value="admin">Admin</option>
                     </select>
                 </div>
-                <button type="submit" class="w-full bg-primary text-white py-2 rounded-xl font-semibold mt-4">Save</button>
+                <button type="submit" class="w-full bg-primary text-white py-2 rounded-xl font-semibold mt-4 hover:bg-primary-dark transition">Save</button>
             </div>
         </form>
     </div>
@@ -256,10 +284,11 @@ function showAddModal() {
     document.getElementById('userName').value = '';
     document.getElementById('userEmail').value = '';
     document.getElementById('userPassword').value = '';
+    document.getElementById('userPassword').required = true;
     document.getElementById('userPhone').value = '';
     document.getElementById('userAddress').value = '';
     document.getElementById('userRole').value = 'customer';
-    document.getElementById('userModal').style.display = 'flex';
+    document.getElementById('userModal').classList.add('active');
 }
 
 function editUser(user) {
@@ -269,15 +298,24 @@ function editUser(user) {
     document.getElementById('userName').value = user.nama;
     document.getElementById('userEmail').value = user.email;
     document.getElementById('userPassword').value = '';
+    document.getElementById('userPassword').required = false;
+    document.getElementById('userPassword').placeholder = 'Kosongkan jika tidak diubah';
     document.getElementById('userPhone').value = user.no_hp || '';
     document.getElementById('userAddress').value = user.alamat || '';
     document.getElementById('userRole').value = user.role;
-    document.getElementById('userModal').style.display = 'flex';
+    document.getElementById('userModal').classList.add('active');
 }
 
 function closeModal() {
-    document.getElementById('userModal').style.display = 'none';
+    document.getElementById('userModal').classList.remove('active');
 }
+
+// Close modal when clicking outside
+document.getElementById('userModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
 </script>
 
 <?= global_route_script() ?>
