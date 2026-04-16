@@ -3,18 +3,33 @@
  * Common functions for Laundry app
  */
 session_start();
-require_once __DIR__ . '/koneksi.php';
 
+// Database configuration
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'laundry_db');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+
+// Fungsi koneksi database (hanya dideklarasikan SEKALI di sini)
 function get_db() {
     static $db = null;
     if ($db === null) {
-        $dsn = 'mysql:host=localhost;dbname=laundry_db;charset=utf8mb4';
-        $options = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC];
-        $db = new PDO($dsn, 'root', '', $options);
+        try {
+            $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
+            $options = [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ];
+            $db = new PDO($dsn, DB_USER, DB_PASS, $options);
+        } catch (PDOException $e) {
+            die('Database connection failed: ' . $e->getMessage());
+        }
     }
     return $db;
 }
 
+// Role-based access control
 function require_customer($db = null) {
     $db = $db ?: get_db();
     $user = currentUser($db);
@@ -55,6 +70,7 @@ function require_admin($db = null) {
     return $user;
 }
 
+// User functions
 function currentUser($db = null) {
     if (!$db) $db = get_db();
     if (empty($_SESSION['user_id'])) return null;
@@ -63,6 +79,25 @@ function currentUser($db = null) {
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
+function loginUser($email, $password) {
+    $db = get_db();
+    $stmt = $db->prepare('SELECT * FROM user WHERE email = ?');
+    $stmt->execute([$email]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Password comparison (plain text as per your current implementation)
+    return ($user && $password === $user['password']) ? $user : false;
+}
+
+function logout_user() {
+    session_destroy();
+    session_start();
+}
+
+function is_logged_in() {
+    return isset($_SESSION['user_id']);
+}
+
+// Order functions
 function update_order_status($order_id, $new_status, $db = null) {
     $db = $db ?: get_db();
     $stmt = $db->prepare('UPDATE orders SET status_order = ? WHERE id_order = ?');
@@ -111,62 +146,6 @@ function get_order($id, $db = null) {
         WHERE o.id_order = ?');
     $stmt->execute([$id]);
     return $stmt->fetch();
-}
-
-function get_services($db = null) {
-    $db = $db ?: get_db();
-    $stmt = $db->query('SELECT * FROM layanan');
-    return $stmt->fetchAll();
-}
-
-function get_service($id, $db = null) {
-    $db = $db ?: get_db();
-    $stmt = $db->prepare('SELECT * FROM layanan WHERE id_layanan = ?');
-    $stmt->execute([$id]);
-    return $stmt->fetch();
-}
-
-function set_flash($key, $message) {
-    $_SESSION['flash'][$key] = $message;
-}
-
-function get_flash($key) {
-    if (isset($_SESSION['flash'][$key])) {
-        $msg = $_SESSION['flash'][$key];
-        unset($_SESSION['flash'][$key]);
-        return $msg;
-    }
-    return null;
-}
-
-function loginUser($email, $password) {
-    $db = get_db();
-    $stmt = $db->prepare('SELECT * FROM user WHERE email = ?');
-    $stmt->execute([$email]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-    // Password comparison (plain text as per your current implementation)
-    return ($user && $password === $user['password']) ? $user : false;
-}
-
-function logout_user() {
-    session_destroy();
-    session_start();
-}
-
-function is_logged_in() {
-    return isset($_SESSION['user_id']);
-}
-
-function set_current_order($data) {
-    $_SESSION['current_order'] = array_merge($_SESSION['current_order'] ?? [], $data);
-}
-
-function get_current_order() {
-    return $_SESSION['current_order'] ?? [];
-}
-
-function clear_current_order() {
-    unset($_SESSION['current_order']);
 }
 
 function create_order($db = null) {
@@ -220,6 +199,48 @@ function verify_payment($order_id, $db = null) {
     return $stmt->execute([$order_id]);
 }
 
+// Session order functions
+function set_current_order($data) {
+    $_SESSION['current_order'] = array_merge($_SESSION['current_order'] ?? [], $data);
+}
+
+function get_current_order() {
+    return $_SESSION['current_order'] ?? [];
+}
+
+function clear_current_order() {
+    unset($_SESSION['current_order']);
+}
+
+// Service functions
+function get_services($db = null) {
+    $db = $db ?: get_db();
+    $stmt = $db->query('SELECT * FROM layanan');
+    return $stmt->fetchAll();
+}
+
+function get_service($id, $db = null) {
+    $db = $db ?: get_db();
+    $stmt = $db->prepare('SELECT * FROM layanan WHERE id_layanan = ?');
+    $stmt->execute([$id]);
+    return $stmt->fetch();
+}
+
+// Flash message functions
+function set_flash($key, $message) {
+    $_SESSION['flash'][$key] = $message;
+}
+
+function get_flash($key) {
+    if (isset($_SESSION['flash'][$key])) {
+        $msg = $_SESSION['flash'][$key];
+        unset($_SESSION['flash'][$key]);
+        return $msg;
+    }
+    return null;
+}
+
+// Count functions
 function get_user_count($db = null) {
     $db = $db ?: get_db();
     $stmt = $db->query('SELECT COUNT(*) FROM user');
@@ -250,6 +271,7 @@ function get_processed_orders_count($db = null) {
     return $stmt->fetchColumn();
 }
 
+// UI Functions
 function global_route_script() {
     echo '
 <script>
