@@ -156,6 +156,7 @@ function create_order($db = null) {
         VALUES (?, ?, ?, ?, ?, ?, ?)');
     
     $id_layanan = $current['id_layanan'] ?? 1;
+    // Gunakan total_price yang sudah termasuk diskon
     $hargaSnapshot = $current['total_price'] ?? 50000;
     $beratCucian = $current['weight'] ?? 1;
     $catatan = $current['notes'] ?? '';
@@ -290,6 +291,19 @@ function global_route_script() {
     el.classList.add("fade-in-up");
   });
 })();
-</script>';
+</script>
+<style>
+.fade-in-up {
+  animation: fadeInUp 0.5s ease forwards;
+  opacity: 0;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.card-animate {
+  opacity: 0;
+}
+</style>';
 }
 ?>

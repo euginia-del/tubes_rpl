@@ -84,11 +84,29 @@ tailwind.config = {
                     <span class="text-gray-500 dark:text-gray-400">Weight</span>
                     <span class="font-semibold text-gray-800 dark:text-white"><?= $currentOrder['weight'] ?? 0 ?> kg</span>
                 </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-500 dark:text-gray-400">Total Price</span>
+                <?php if (($currentOrder['discount'] ?? 0) > 0): ?>
+                <div class="flex justify-between py-2 border-b dark:border-slate-700">
+                    <span class="text-gray-500 dark:text-gray-400">Subtotal</span>
+                    <span class="font-semibold text-gray-800 dark:text-white">Rp <?= number_format($currentOrder['subtotal'] ?? 0,0,',','.') ?></span>
+                </div>
+                <div class="flex justify-between py-2 border-b dark:border-slate-700 bg-emerald-50 dark:bg-emerald-900/20 -mx-2 px-2 rounded-lg">
+                    <span class="text-emerald-600 dark:text-emerald-400 font-semibold">Diskon (<?= $currentOrder['discount_percent'] ?? 0 ?>%)</span>
+                    <span class="font-semibold text-emerald-600 dark:text-emerald-400">- Rp <?= number_format($currentOrder['discount'] ?? 0,0,',','.') ?></span>
+                </div>
+                <?php endif; ?>
+                <div class="flex justify-between py-2 pt-3">
+                    <span class="text-gray-500 dark:text-gray-400 font-semibold">Total Price</span>
                     <span class="font-bold text-primary text-xl">Rp <?= number_format($currentOrder['total_price'] ?? 0,0,',','.') ?></span>
                 </div>
             </div>
+            <?php if (($currentOrder['discount'] ?? 0) > 0): ?>
+            <div class="mt-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
+                <div class="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                    <span class="material-symbols-outlined text-sm">savings</span>
+                    <span class="text-sm font-semibold">Anda hemat Rp <?= number_format($currentOrder['discount'] ?? 0,0,',','.') ?>!</span>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
 
         <!-- Schedule Form -->
