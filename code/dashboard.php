@@ -7,6 +7,12 @@ if (!$user || $user['role'] !== 'customer') {
 }
 
 $db = get_db();
+
+// Get user saldo
+$stmt = $db->prepare('SELECT saldo FROM user WHERE id_user = ?');
+$stmt->execute([$user['id_user']]);
+$saldo = $stmt->fetchColumn();
+
 $stmt = $db->prepare('SELECT o.*, l.nama_layanan as service_name 
     FROM orders o 
     LEFT JOIN layanan l ON o.id_layanan = l.id_layanan 
@@ -48,7 +54,7 @@ tailwind.config = {
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 min-h-screen pb-20 md:pb-0">
 
-<!-- Desktop Sidebar - Hidden on Mobile -->
+<!-- Desktop Sidebar -->
 <div class="hidden md:flex md:fixed md:inset-y-0 md:left-0 md:w-72 bg-white dark:bg-slate-800 shadow-xl flex-col">
     <div class="flex items-center justify-center p-6 border-b dark:border-slate-700">
         <div class="flex items-center gap-3">
@@ -71,6 +77,10 @@ tailwind.config = {
         <a href="history.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
             <span class="material-symbols-outlined">receipt_long</span>
             <span>History</span>
+        </a>
+        <a href="topup.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+            <span class="material-symbols-outlined">wallet</span>
+            <span>Top Up</span>
         </a>
         <a href="price.php" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition">
             <span class="material-symbols-outlined">price_check</span>
@@ -116,6 +126,22 @@ tailwind.config = {
         <div class="mb-8">
             <h1 class="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">Welcome back, <?= htmlspecialchars($user['nama']) ?>! 👋</h1>
             <p class="text-gray-500 dark:text-gray-400 mt-1">Ready to do your laundry today?</p>
+        </div>
+
+        <!-- Saldo Card -->
+        <div class="bg-gradient-to-r from-primary to-secondary rounded-2xl p-5 text-white shadow-lg mb-8 card-animate">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-white/80 text-sm">Saldo Anda</p>
+                    <p class="text-3xl font-bold mt-1">Rp <?= number_format($saldo, 0, ',', '.') ?></p>
+                </div>
+                <div class="flex gap-2">
+                    <a href="topup.php" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">add</span>
+                        Top Up
+                    </a>
+                </div>
+            </div>
         </div>
 
         <!-- Stats Cards -->
@@ -200,6 +226,10 @@ tailwind.config = {
         <a href="history.php" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400">
             <span class="material-symbols-outlined">receipt_long</span>
             <span class="text-xs">History</span>
+        </a>
+        <a href="topup.php" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400">
+            <span class="material-symbols-outlined">wallet</span>
+            <span class="text-xs">Top Up</span>
         </a>
         <a href="profile.php" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400">
             <span class="material-symbols-outlined">person</span>

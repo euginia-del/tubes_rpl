@@ -19,6 +19,14 @@ $db = get_db();
 $stmt = $db->prepare('SELECT * FROM pembayaran WHERE id_order = ?');
 $stmt->execute([$order_id]);
 $payment = $stmt->fetch();
+
+// Get user saldo for customer
+$saldo = 0;
+if ($user['role'] === 'customer') {
+    $stmt = $db->prepare('SELECT saldo FROM user WHERE id_user = ?');
+    $stmt->execute([$user['id_user']]);
+    $saldo = $stmt->fetchColumn();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -163,7 +171,70 @@ tailwind.config = {
         </div>
     </div>
 
-    <!-- Action Button for Worker -->
+    <!-- ========== TOMBOL BAYAR UNTUK CUSTOMER ========== -->
+    <?php if ($user['role'] === 'customer' && $order['status_order'] === 'pending'): ?>
+    
+    <!-- Cek apakah sudah pilih metode pembayaran -->
+    <?php if (!$payment || ($payment && $payment['status_bayar'] === 'pending')): ?>
+    <div class="mt-6">
+        <a href="payment.php?order_id=<?= $order['id_order'] ?>" class="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark text-white font-bold py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl">
+            <span class="material-symbols-outlined">payments</span>
+            <span>Bayar Sekarang</span>
+        </a>
+    </div>
+    <?php endif; ?>
+    
+    <!-- Tampilkan info saldo -->
+    <div class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-blue-600 dark:text-blue-400">Saldo Anda</p>
+                <p class="text-xl font-bold text-blue-700 dark:text-blue-300">Rp <?= number_format($saldo, 0, ',', '.') ?></p>
+            </div>
+            <a href="topup.php" class="text-sm bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600 transition">Top Up Saldo</a>
+        </div>
+        <?php if ($saldo >= $order['harga_snapshot']): ?>
+        <p class="text-xs text-green-600 mt-2">✅ Saldo cukup! Anda bisa bayar pakai saldo.</p>
+        <?php else: ?>
+        <p class="text-xs text-red-500 mt-2">⚠️ Saldo tidak cukup. Silakan top up atau pilih metode pembayaran lain.</p>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <!-- ========== INFO PEMBAYARAN (JIKA SUDAH ADA) ========== -->
+    <?php if ($payment && $payment['status_bayar'] === 'pending'): ?>
+    <div class="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl">
+        <div class="flex items-start gap-3">
+            <span class="material-symbols-outlined text-yellow-600">schedule</span>
+            <div>
+                <p class="text-sm font-semibold text-yellow-800 dark:text-yellow-300">Menunggu Verifikasi</p>
+                <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                    Pembayaran via <strong><?= strtoupper($payment['metode']) ?></strong> sedang menunggu verifikasi supervisor.
+                    Status akan berubah setelah pembayaran dikonfirmasi.
+                </p>
+                <?php if ($payment['nomor_transaksi']): ?>
+                <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                    No. Transaksi: <?= $payment['nomor_transaksi'] ?>
+                </p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <?php elseif ($payment && $payment['status_bayar'] === 'lunas'): ?>
+    <div class="mt-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
+        <div class="flex items-start gap-3">
+            <span class="material-symbols-outlined text-emerald-600">check_circle</span>
+            <div>
+                <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Pembayaran Terverifikasi</p>
+                <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                    Pembayaran sudah diverifikasi. Order sedang diproses.
+                </p>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- ========== ACTION BUTTON UNTUK WORKER ========== -->
     <?php if ($user['role'] === 'worker' && $order['status_order'] === 'pending'): ?>
     <div class="mt-6">
         <form method="post" action="order_process.php">
@@ -172,6 +243,19 @@ tailwind.config = {
             <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark text-white font-bold py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2">
                 <span class="material-symbols-outlined">play_arrow</span>
                 <span>Process This Order</span>
+            </button>
+        </form>
+    </div>
+    <?php endif; ?>
+
+    <!-- ========== ACTION BUTTON UNTUK SUPERVISOR VERIFIKASI ========== -->
+    <?php if ($user['role'] === 'supervisor' && $payment && $payment['status_bayar'] === 'pending' && $order['status_order'] === 'pending'): ?>
+    <div class="mt-6">
+        <form method="post" action="verify_payment_process.php">
+            <input type="hidden" name="order_id" value="<?= $order['id_order'] ?>">
+            <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">verified</span>
+                <span>Verifikasi Pembayaran</span>
             </button>
         </form>
     </div>
