@@ -28,7 +28,12 @@ function get_db() {
     return $db;
 }
 
-// Role-based access control
+// ========== FUNGSI HASH PASSWORD ==========
+function hash_password($password) {
+    return hash('sha256', $password);
+}
+
+// ========== ROLE-BASED ACCESS CONTROL ==========
 function require_customer($db = null) {
     $db = $db ?: get_db();
     $user = currentUser($db);
@@ -77,11 +82,13 @@ function currentUser($db = null) {
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-// LOGIN FUNCTION - PLAIN TEXT
+// ========== LOGIN DENGAN HASH PASSWORD ==========
 function loginUser($email, $password) {
     $db = get_db();
+    $hashed_password = hash_password($password);
+    
     $stmt = $db->prepare('SELECT * FROM user WHERE email = ? AND password = ?');
-    $stmt->execute([$email, $password]);
+    $stmt->execute([$email, $hashed_password]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
     return $user ? $user : false;
@@ -97,6 +104,7 @@ function is_logged_in() {
     return isset($_SESSION['user_id']);
 }
 
+// ========== ORDER FUNCTIONS ==========
 function update_order_status($order_id, $new_status, $db = null) {
     $db = $db ?: get_db();
     $stmt = $db->prepare('UPDATE orders SET status_order = ? WHERE id_order = ?');
@@ -198,6 +206,7 @@ function verify_payment($order_id, $db = null) {
     return $stmt->execute([$order_id]);
 }
 
+// ========== SESSION ORDER FUNCTIONS ==========
 function set_current_order($data) {
     $_SESSION['current_order'] = array_merge($_SESSION['current_order'] ?? [], $data);
 }
@@ -211,6 +220,7 @@ function clear_current_order() {
     unset($_SESSION['last_order_id']);
 }
 
+// ========== SERVICE FUNCTIONS ==========
 function get_services($db = null) {
     $db = $db ?: get_db();
     $stmt = $db->query('SELECT * FROM layanan');
@@ -224,6 +234,7 @@ function get_service($id, $db = null) {
     return $stmt->fetch();
 }
 
+// ========== FLASH MESSAGE FUNCTIONS ==========
 function set_flash($key, $message) {
     $_SESSION['flash'][$key] = $message;
 }
@@ -237,6 +248,7 @@ function get_flash($key) {
     return null;
 }
 
+// ========== COUNT FUNCTIONS ==========
 function get_user_count($db = null) {
     $db = $db ?: get_db();
     $stmt = $db->query('SELECT COUNT(*) FROM user');
@@ -267,6 +279,27 @@ function get_processed_orders_count($db = null) {
     return $stmt->fetchColumn();
 }
 
+// ========== REGISTER FUNCTION ==========
+function registerUser($nama, $email, $password, $no_hp, $alamat) {
+    $db = get_db();
+    
+    // Cek email sudah terdaftar
+    $stmt = $db->prepare('SELECT COUNT(*) FROM user WHERE email = ?');
+    $stmt->execute([$email]);
+    if ($stmt->fetchColumn() > 0) {
+        return false;
+    }
+    
+    // Hash password sebelum disimpan
+    $hashed_password = hash_password($password);
+    
+    $stmt = $db->prepare('INSERT INTO user (nama, email, password, no_hp, alamat, role, saldo) 
+        VALUES (?, ?, ?, ?, ?, "customer", 0)');
+    
+    return $stmt->execute([$nama, $email, $hashed_password, $no_hp, $alamat]);
+}
+
+// ========== UI FUNCTIONS ==========
 function global_route_script() {
     echo '
 <script>

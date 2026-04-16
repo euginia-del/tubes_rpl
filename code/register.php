@@ -7,28 +7,18 @@ if (is_logged_in()) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nama'], $_POST['email'], $_POST['password'], $_POST['no_hp'], $_POST['alamat'])) {
-    $db = get_db();
     $nama = trim($_POST['nama']);
     $email = trim($_POST['email']);
     $password = trim($_POST['password']);
     $no_hp = trim($_POST['no_hp']);
     $alamat = trim($_POST['alamat']);
     
-    // Cek email sudah terdaftar
-    $stmt = $db->prepare('SELECT COUNT(*) FROM user WHERE email = ?');
-    $stmt->execute([$email]);
-    if ($stmt->fetchColumn() > 0) {
-        set_flash('error', 'Email sudah terdaftar.');
+    if (registerUser($nama, $email, $password, $no_hp, $alamat)) {
+        set_flash('success', 'Akun berhasil dibuat. Silakan login.');
+        header('Location: login.php');
+        exit;
     } else {
-        // Simpan password plain text
-        $stmt = $db->prepare('INSERT INTO user (nama, email, password, no_hp, alamat, role, saldo) VALUES (?, ?, ?, ?, ?, "customer", 0)');
-        if ($stmt->execute([$nama, $email, $password, $no_hp, $alamat])) {
-            set_flash('success', 'Akun berhasil dibuat. Silakan login.');
-            header('Location: login.php');
-            exit;
-        } else {
-            set_flash('error', 'Gagal membuat akun.');
-        }
+        set_flash('error', 'Email sudah terdaftar atau gagal membuat akun.');
     }
 }
 ?>
