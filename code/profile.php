@@ -15,28 +15,32 @@ $db = get_db();
 $role = $user['role'];
 $userId = $user['id_user'];
 
-// ========== UNTUK USER SENDIRI (ORDERS MILIKNYA) ==========
-$stmt = $db->prepare('SELECT * FROM orders WHERE id_user = ? ORDER BY tanggal_order DESC');
-$stmt->execute([$userId]);
-$myOrders = $stmt->fetchAll();
-
-$myTotalOrders = count($myOrders);
+// ========== UNTUK CUSTOMER SAJA (ORDERS MILIKNYA) ==========
+$myTotalOrders = 0;
 $myPendingOrders = 0;
 $myProcessOrders = 0;
 $myCompletedOrders = 0;
 $myTotalSpent = 0;
+$myActiveOrders = 0;
 
-foreach ($myOrders as $order) {
-    if ($order['status_order'] === 'pending') $myPendingOrders++;
-    elseif ($order['status_order'] === 'proses') $myProcessOrders++;
-    elseif ($order['status_order'] === 'selesai') {
-        $myCompletedOrders++;
-        $myTotalSpent += $order['harga_snapshot'];
+if ($role === 'customer') {
+    $stmt = $db->prepare('SELECT * FROM orders WHERE id_user = ? ORDER BY tanggal_order DESC');
+    $stmt->execute([$userId]);
+    $myOrders = $stmt->fetchAll();
+    
+    $myTotalOrders = count($myOrders);
+    foreach ($myOrders as $order) {
+        if ($order['status_order'] === 'pending') $myPendingOrders++;
+        elseif ($order['status_order'] === 'proses') $myProcessOrders++;
+        elseif ($order['status_order'] === 'selesai') {
+            $myCompletedOrders++;
+            $myTotalSpent += $order['harga_snapshot'];
+        }
     }
+    $myActiveOrders = $myPendingOrders + $myProcessOrders;
 }
-$myActiveOrders = $myPendingOrders + $myProcessOrders;
 
-// ========== UNTUK SYSTEM OVERVIEW (SEMUA ORDER) ==========
+// ========== UNTUK SEMUA ROLE (SYSTEM OVERVIEW) ==========
 $stmt = $db->query('SELECT * FROM orders ORDER BY tanggal_order DESC');
 $allOrders = $stmt->fetchAll();
 
@@ -77,30 +81,18 @@ tailwind.config = {
 }
 </script>
 <style>
-/* Warna-warni untuk stats card */
-.stat-card-blue {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-}
-.stat-card-amber {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-}
-.stat-card-purple {
-    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-}
-.stat-card-emerald {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-}
-.stat-card-sky {
-    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
-}
-.stat-card-rose {
-    background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
-}
+.stat-card-blue { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+.stat-card-amber { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+.stat-card-purple { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+.stat-card-emerald { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+.stat-card-sky { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+.stat-card-rose { background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%); }
+.stat-card-indigo { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
 </style>
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 min-h-screen pb-20 md:pb-0">
 
-<!-- Desktop Sidebar - sesuai role -->
+<!-- Desktop Sidebar -->
 <div class="hidden md:flex md:fixed md:inset-y-0 md:left-0 md:w-72 bg-white dark:bg-slate-800 shadow-xl flex-col">
     <div class="flex items-center justify-center p-6 border-b dark:border-slate-700">
         <div class="flex items-center gap-3">
@@ -226,9 +218,11 @@ tailwind.config = {
             </div>
         </div>
 
-        <!-- MY ORDERS STATISTICS (WARNA-WARNI) -->
+        <!-- ========== UNTUK CUSTOMER SAJA ========== -->
+        <?php if ($role === 'customer'): ?>
+        <!-- My Order Statistics -->
         <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4">My Order Statistics</h3>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div class="stat-card-blue rounded-2xl p-5 text-white shadow-lg transform transition hover:scale-105">
                 <p class="text-blue-100 text-sm">Total Orders</p>
                 <p class="text-3xl font-bold"><?= $myTotalOrders ?></p>
@@ -247,7 +241,7 @@ tailwind.config = {
             </div>
         </div>
 
-        <!-- Additional Stats -->
+        <!-- Additional Stats for Customer -->
         <div class="grid md:grid-cols-2 gap-6 mb-8">
             <div class="stat-card-sky rounded-2xl p-5 text-white shadow-lg">
                 <div class="flex items-center justify-between">
@@ -268,13 +262,13 @@ tailwind.config = {
                 </div>
             </div>
         </div>
+        <?php endif; ?>
 
-        <!-- SYSTEM OVERVIEW (untuk Worker/Supervisor/Admin) -->
-        <?php if ($role !== 'customer'): ?>
+        <!-- ========== SYSTEM OVERVIEW (UNTUK SEMUA ROLE) ========== -->
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 mb-6">
             <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                 <span class="material-symbols-outlined text-primary">insights</span>
-                System Overview (All Orders)
+                <?= $role === 'customer' ? 'System Overview' : 'System Overview (All Orders)' ?>
             </h3>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div class="text-center p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl text-white">
@@ -294,6 +288,8 @@ tailwind.config = {
                     <p class="text-sm text-emerald-100">Completed</p>
                 </div>
             </div>
+            
+            <!-- Total Revenue (untuk Admin & Supervisor) -->
             <?php if ($role === 'admin' || $role === 'supervisor'): ?>
             <div class="mt-4 p-4 bg-gradient-to-r from-primary to-secondary rounded-xl text-white">
                 <div class="flex justify-between items-center">
@@ -303,7 +299,6 @@ tailwind.config = {
             </div>
             <?php endif; ?>
         </div>
-        <?php endif; ?>
 
         <!-- Logout Button -->
         <form method="post">
