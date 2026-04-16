@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['konfirmasi'])) {
             // UPDATE STATUS ORDER LANGSUNG KE PROSES
             update_order_status($order_id, 'proses');
             
-            // CATAT KE PEMBAYARAN
+            // CATAT KE PEMBAYARAN (status langsung lunas karena pakai saldo)
             $stmt = $db->prepare('INSERT INTO pembayaran (id_order, metode, nomor_transaksi, tanggal_pembayaran, jumlah_bayar, status_bayar) VALUES (?, ?, ?, NOW(), ?, "lunas")');
             $stmt->execute([$order_id, $metode, $nomor_transaksi, $order['harga_snapshot']]);
             
@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['konfirmasi'])) {
             exit;
         }
     } else {
-        // Upload bukti untuk metode lain
+        // Upload bukti untuk metode lain (GoPay, DANA, Bank, Tunai)
         $bukti_pembayaran = null;
         if (isset($_FILES['bukti_pembayaran']) && $_FILES['bukti_pembayaran']['error'] === UPLOAD_ERR_OK) {
             $upload_dir = 'uploads/bukti_pembayaran/';
@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['konfirmasi'])) {
         
         $catatan = $_POST['catatan'] ?? '';
         
-        // SIMPAN KE PEMBAYARAN
+        // SIMPAN KE PEMBAYARAN (status pending, menunggu verifikasi admin)
         $stmt = $db->prepare('INSERT INTO pembayaran (id_order, metode, nomor_transaksi, tanggal_pembayaran, jumlah_bayar, status_bayar, bukti_pembayaran, catatan_pembayaran) VALUES (?, ?, ?, NOW(), ?, "pending", ?, ?)');
         $stmt->execute([$order_id, $metode, $nomor_transaksi, $order['harga_snapshot'], $bukti_pembayaran, $catatan]);
         
@@ -186,6 +186,11 @@ function goBack() {
             </div>
             <a href="topup.php" class="text-sm bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600 transition">Top Up Saldo</a>
         </div>
+        <?php if ($saldo >= $order['harga_snapshot']): ?>
+        <p class="text-xs text-green-600 mt-2">✅ Saldo cukup! Bisa bayar pakai saldo.</p>
+        <?php else: ?>
+        <p class="text-xs text-red-500 mt-2">⚠️ Saldo tidak cukup. Butuh tambahan Rp <?= number_format($order['harga_snapshot'] - $saldo, 0, ',', '.') ?></p>
+        <?php endif; ?>
     </div>
 
     <?php if (!$selected_method): ?>
@@ -223,23 +228,24 @@ function goBack() {
                 
                 <?php if ($selected_method === 'saldo'): ?>
                 <div class="space-y-2">
-                    <p class="text-gray-600 dark:text-gray-300">🔹 Anda akan membayar <strong>Rp <?= number_format($order['harga_snapshot'], 0, ',', '.') ?></strong> menggunakan saldo</p>
-                    <p class="text-gray-600 dark:text-gray-300">🔹 Saldo Anda saat ini: <strong class="<?= $saldo >= $order['harga_snapshot'] ? 'text-emerald-600' : 'text-red-600' ?>">Rp <?= number_format($saldo, 0, ',', '.') ?></strong></p>
+                    <p>🔹 Total yang harus dibayar: <strong class="text-primary">Rp <?= number_format($order['harga_snapshot'], 0, ',', '.') ?></strong></p>
+                    <p>🔹 Saldo Anda: <strong><?= number_format($saldo, 0, ',', '.') ?></strong></p>
                     <?php if ($saldo >= $order['harga_snapshot']): ?>
-                    <p class="text-emerald-600 text-sm">✅ Saldo cukup! Sisa saldo setelah pembayaran: Rp <?= number_format($saldo - $order['harga_snapshot'], 0, ',', '.') ?></p>
+                    <p class="text-emerald-600">✅ Saldo mencukupi</p>
                     <?php else: ?>
-                    <p class="text-red-600 text-sm">❌ Saldo tidak cukup! Butuh tambahan Rp <?= number_format($order['harga_snapshot'] - $saldo, 0, ',', '.') ?></p>
+                    <p class="text-red-600">❌ Saldo tidak mencukupi</p>
                     <?php endif; ?>
                 </div>
                 <?php else: ?>
                 <div class="space-y-3">
-                    <p class="text-gray-600 dark:text-gray-300">🔹 Transfer ke rekening berikut:</p>
-                    <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border">
+                    <p>🔹 Transfer ke rekening berikut:</p>
+                    <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border text-center">
                         <p class="font-mono text-lg font-bold text-primary"><?= $selected_method_data['rekening'] ?></p>
                     </div>
-                    <p class="text-gray-600 dark:text-gray-300 mt-3">🔹 Nominal: <strong class="text-primary text-lg">Rp <?= number_format($order['harga_snapshot'], 0, ',', '.') ?></strong></p>
-                    <p class="text-gray-600 dark:text-gray-300">🔹 Nomor Transaksi: <strong class="text-primary"><?= $nomor_transaksi ?></strong></p>
-                    <p class="text-sm text-gray-500 mt-2">*Simpan nomor transaksi ini untuk konfirmasi pembayaran</p>
+                    <p>🔹 Nominal: <strong class="text-primary">Rp <?= number_format($order['harga_snapshot'], 0, ',', '.') ?></strong></p>
+                    <p>🔹 Nomor Transaksi: <strong class="text-primary"><?= $nomor_transaksi ?></strong></p>
+                    <p class="text-sm text-gray-500">*Simpan nomor transaksi ini untuk konfirmasi pembayaran</p>
+                    <p class="text-sm text-red-500 mt-2">⚠️ Setelah transfer, upload bukti pembayaran di bawah ini!</p>
                 </div>
                 <?php endif; ?>
             </div>
@@ -301,7 +307,7 @@ function goBack() {
                     2. Ikuti instruksi pembayaran<br>
                     3. Upload bukti transfer (jika diperlukan)<br>
                     4. Klik Konfirmasi Pembayaran<br>
-                    5. Order akan diproses setelah diverifikasi admin
+                    5. Admin akan memverifikasi pembayaran Anda
                 </p>
             </div>
         </div>

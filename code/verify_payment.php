@@ -4,7 +4,7 @@ require_admin();
 
 $db = get_db();
 
-// Handle verify payment
+// Handle verify payment (TERIMA)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_order_id'])) {
     $orderId = $_POST['verify_order_id'];
     
@@ -21,15 +21,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_order_id'])) {
     exit;
 }
 
-// Handle reject payment
+// Handle reject payment (TOLAK)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reject_order_id'])) {
     $orderId = $_POST['reject_order_id'];
     $alasan = $_POST['alasan_penolakan'] ?? 'Bukti tidak valid';
     
+    // Update payment status
     $stmt = $db->prepare('UPDATE pembayaran SET status_bayar = "gagal", catatan_pembayaran = CONCAT(IFNULL(catatan_pembayaran, ""), " | Ditolak: ", ?) WHERE id_order = ?');
     $stmt->execute([$alasan, $orderId]);
     
-    set_flash('error', 'Pembayaran order #' . $orderId . ' ditolak.');
+    set_flash('error', 'Pembayaran order #' . $orderId . ' ditolak. Alasan: ' . $alasan);
     header('Location: verify_payments.php');
     exit;
 }
@@ -186,6 +187,7 @@ tailwind.config = {
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden">
             <div class="px-6 py-4 border-b dark:border-slate-700 bg-amber-50 dark:bg-amber-900/20">
                 <h2 class="text-lg font-bold text-amber-800 dark:text-amber-300">Menunggu Verifikasi (<?= count($pendingPayments) ?>)</h2>
+                <p class="text-sm text-amber-600">Customer sudah upload bukti, silakan verifikasi</p>
             </div>
             
             <div class="p-6">
@@ -193,6 +195,7 @@ tailwind.config = {
                 <div class="text-center py-12">
                     <span class="material-symbols-outlined text-6xl text-gray-400">check_circle</span>
                     <p class="text-gray-500 dark:text-gray-400 mt-4">Tidak ada pembayaran yang menunggu verifikasi</p>
+                    <p class="text-gray-400 text-sm mt-2">Customer akan upload bukti setelah melakukan pembayaran</p>
                 </div>
                 <?php else: ?>
                 <div class="space-y-4">
@@ -219,7 +222,7 @@ tailwind.config = {
                                 <?php endif; ?>
                                 
                                 <?php if ($payment['catatan_pembayaran']): ?>
-                                <p class="text-xs text-gray-500 mt-1">📝 Catatan: <?= htmlspecialchars($payment['catatan_pembayaran']) ?></p>
+                                <p class="text-xs text-gray-500 mt-1">📝 Catatan Customer: <?= htmlspecialchars($payment['catatan_pembayaran']) ?></p>
                                 <?php endif; ?>
                                 
                                 <?php if ($payment['bukti_pembayaran'] && file_exists($payment['bukti_pembayaran'])): ?>
@@ -229,11 +232,15 @@ tailwind.config = {
                                         Lihat Bukti Pembayaran
                                     </a>
                                 </div>
+                                <?php else: ?>
+                                <div class="mt-2 text-red-500 text-xs">
+                                    ⚠️ Tidak ada bukti pembayaran
+                                </div>
                                 <?php endif; ?>
                             </div>
                             <div class="flex gap-2">
                                 <button onclick="openVerifyModal(<?= $payment['id_order'] ?>)" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-xl font-semibold transition">
-                                    ✅ Verifikasi
+                                    ✅ Terima
                                 </button>
                                 <button onclick="openRejectModal(<?= $payment['id_order'] ?>)" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-xl font-semibold transition">
                                     ❌ Tolak
@@ -249,16 +256,17 @@ tailwind.config = {
     </div>
 </div>
 
-<!-- Modal Verifikasi -->
+<!-- Modal Terima -->
 <div id="verifyModal" class="modal">
     <div class="modal-content bg-white dark:bg-slate-800 rounded-2xl p-6">
         <h3 class="text-xl font-bold mb-4">Konfirmasi Verifikasi</h3>
-        <p class="mb-4">Apakah Anda yakin ingin memverifikasi pembayaran ini?</p>
+        <p class="mb-4">Apakah Anda yakin ingin MENERIMA pembayaran ini?</p>
+        <p class="text-sm text-gray-500 mb-4">Order akan segera diproses oleh worker.</p>
         <form method="post">
             <input type="hidden" name="verify_order_id" id="verifyOrderId">
             <div class="flex gap-3">
                 <button type="button" onclick="closeVerifyModal()" class="flex-1 bg-gray-200 dark:bg-slate-700 py-2 rounded-xl">Batal</button>
-                <button type="submit" class="flex-1 bg-emerald-500 text-white py-2 rounded-xl">Ya, Verifikasi</button>
+                <button type="submit" class="flex-1 bg-emerald-500 text-white py-2 rounded-xl">Ya, Terima</button>
             </div>
         </form>
     </div>
@@ -271,7 +279,7 @@ tailwind.config = {
         <p class="mb-2">Alasan penolakan:</p>
         <form method="post">
             <input type="hidden" name="reject_order_id" id="rejectOrderId">
-            <textarea name="alasan_penolakan" rows="3" class="w-full border rounded-xl p-3 mb-4" placeholder="Contoh: Bukti transfer tidak jelas" required></textarea>
+            <textarea name="alasan_penolakan" rows="3" class="w-full border rounded-xl p-3 mb-4 dark:bg-slate-700" placeholder="Contoh: Bukti transfer tidak jelas, nominal tidak sesuai, dll" required></textarea>
             <div class="flex gap-3">
                 <button type="button" onclick="closeRejectModal()" class="flex-1 bg-gray-200 dark:bg-slate-700 py-2 rounded-xl">Batal</button>
                 <button type="submit" class="flex-1 bg-red-500 text-white py-2 rounded-xl">Ya, Tolak</button>
