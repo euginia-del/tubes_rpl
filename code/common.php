@@ -268,31 +268,86 @@ function get_processed_orders_count($db = null) {
 
 function global_route_script() {
     echo '
+<!-- Background Bubbles -->
+<div class="bubbles" id="bubbles"></div>
+
 <script>
 (function() {
+  // Create bubbles
+  function createBubbles() {
+    const bubblesContainer = document.getElementById("bubbles");
+    if (!bubblesContainer) return;
+    
+    for (let i = 0; i < 30; i++) {
+      const bubble = document.createElement("div");
+      bubble.classList.add("bubble");
+      const size = Math.random() * 60 + 20;
+      bubble.style.width = size + "px";
+      bubble.style.height = size + "px";
+      bubble.style.left = Math.random() * 100 + "%";
+      bubble.style.animationDelay = Math.random() * 15 + "s";
+      bubble.style.animationDuration = Math.random() * 10 + 10 + "s";
+      bubble.style.opacity = Math.random() * 0.3;
+      bubblesContainer.appendChild(bubble);
+    }
+  }
+  
+  createBubbles();
+  
+  // Dark mode toggle
   const html = document.documentElement;
   const toggleBtns = document.querySelectorAll("#themeToggle");
   const isDark = localStorage.theme === "dark" || (!localStorage.theme && window.matchMedia("(prefers-color-scheme: dark)").matches);
   
-  if (isDark) html.classList.add("dark");
+  if (isDark) {
+    html.classList.add("dark");
+  }
   
   toggleBtns.forEach(btn => {
-    btn.innerHTML = isDark ? "☀️ Light" : "🌙 Dark";
+    btn.innerHTML = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+    btn.classList.add("px-3", "py-1.5", "rounded-full", "text-sm", "font-semibold", "transition-all", "duration-300", "shadow-md");
+    
+    if (isDark) {
+      btn.classList.add("bg-gray-700", "text-white", "hover:bg-gray-600");
+    } else {
+      btn.classList.add("bg-gray-200", "text-gray-800", "hover:bg-gray-300");
+    }
+    
     btn.onclick = function() {
       html.classList.toggle("dark");
-      localStorage.theme = html.classList.contains("dark") ? "dark" : "light";
+      const newIsDark = html.classList.contains("dark");
+      localStorage.theme = newIsDark ? "dark" : "light";
+      
       document.querySelectorAll("#themeToggle").forEach(b => {
-        b.innerHTML = localStorage.theme === "dark" ? "☀️ Light" : "🌙 Dark";
+        b.innerHTML = newIsDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+        if (newIsDark) {
+          b.classList.remove("bg-gray-200", "text-gray-800", "hover:bg-gray-300");
+          b.classList.add("bg-gray-700", "text-white", "hover:bg-gray-600");
+        } else {
+          b.classList.remove("bg-gray-700", "text-white", "hover:bg-gray-600");
+          b.classList.add("bg-gray-200", "text-gray-800", "hover:bg-gray-300");
+        }
       });
     };
   });
 
-  document.querySelectorAll(".card-animate").forEach((el, i) => {
-    el.style.animationDelay = `${i * 0.1}s`;
-    el.classList.add("fade-in-up");
+  // Add animation to cards
+  const observerOptions = { threshold: 0.1, rootMargin: "0px 0px -50px 0px" };
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("fade-in-up");
+        observer.unobserve(entry.target);
+      }
+    });
+  }, observerOptions);
+  
+  document.querySelectorAll(".card-animate").forEach(el => {
+    observer.observe(el);
   });
 })();
 </script>
+
 <style>
 .fade-in-up {
   animation: fadeInUp 0.5s ease forwards;
@@ -304,6 +359,83 @@ function global_route_script() {
 }
 .card-animate {
   opacity: 0;
+}
+
+/* Bubbles animation */
+.bubbles {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.bubble {
+  position: absolute;
+  bottom: -50px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  animation: rise 15s infinite ease-in;
+}
+
+@keyframes rise {
+  0% {
+    bottom: -50px;
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(20px);
+  }
+  100% {
+    bottom: 100%;
+    transform: translateX(-20px);
+  }
+}
+
+/* Dark mode improvements */
+.dark,
+.dark * {
+  color-scheme: dark;
+}
+
+.dark .bg-white {
+  background-color: #1e1e2f !important;
+}
+
+.dark .text-gray-800,
+.dark .text-gray-900 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-gray-500,
+.dark .text-gray-600 {
+  color: #94a3b8 !important;
+}
+
+.dark .border-gray-200 {
+  border-color: #334155 !important;
+}
+
+.dark .bg-gray-50 {
+  background-color: #0f0f1a !important;
+}
+
+.dark .badge-warning {
+  background: #78350f;
+  color: #fbbf24;
+}
+
+.dark .badge-info {
+  background: #1e3a5f;
+  color: #60a5fa;
+}
+
+.dark .badge-success {
+  background: #064e3b;
+  color: #34d399;
 }
 </style>';
 }
