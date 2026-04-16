@@ -15,7 +15,10 @@ $db = get_db();
 $role = $user['role'];
 $userId = $user['id_user'];
 
-// ========== MY ORDER STATISTICS (UNTUK CUSTOMER) ==========
+// ========== MY ORDER STATISTICS (HANYA UNTUK CUSTOMER DAN WORKER/SUPERVISOR) ==========
+// Admin TIDAK perlu My Order Statistics
+$showMyOrderStats = ($role === 'customer' || $role === 'worker' || $role === 'supervisor');
+
 $myTotalOrders = 0;
 $myPendingOrders = 0;
 $myProcessOrders = 0;
@@ -23,16 +26,18 @@ $myCompletedOrders = 0;
 $myTotalSpent = 0;
 $myActiveOrders = 0;
 
-if ($role === 'customer') {
+if ($showMyOrderStats) {
     $stmt = $db->prepare('SELECT * FROM orders WHERE id_user = ? ORDER BY tanggal_order DESC');
     $stmt->execute([$userId]);
     $myOrders = $stmt->fetchAll();
     
     $myTotalOrders = count($myOrders);
     foreach ($myOrders as $order) {
-        if ($order['status_order'] === 'pending') $myPendingOrders++;
-        elseif ($order['status_order'] === 'proses') $myProcessOrders++;
-        elseif ($order['status_order'] === 'selesai') {
+        if ($order['status_order'] === 'pending') {
+            $myPendingOrders++;
+        } elseif ($order['status_order'] === 'proses') {
+            $myProcessOrders++;
+        } elseif ($order['status_order'] === 'selesai') {
             $myCompletedOrders++;
             $myTotalSpent += $order['harga_snapshot'];
         }
@@ -41,13 +46,16 @@ if ($role === 'customer') {
 }
 
 // ========== SYSTEM OVERVIEW (UNTUK ADMIN/SUPERVISOR/WORKER) ==========
+// Customer TIDAK perlu System Overview
+$showSystemOverview = ($role !== 'customer');
+
 $allTotalOrders = 0;
 $allPendingOrders = 0;
 $allProcessOrders = 0;
 $allCompletedOrders = 0;
 $allTotalRevenue = 0;
 
-if ($role !== 'customer') {
+if ($showSystemOverview) {
     $stmt = $db->query('SELECT * FROM orders ORDER BY tanggal_order DESC');
     $allOrders = $stmt->fetchAll();
     
@@ -62,10 +70,13 @@ if ($role !== 'customer') {
     }
 }
 
-// Get user saldo
-$stmt = $db->prepare('SELECT saldo FROM user WHERE id_user = ?');
-$stmt->execute([$userId]);
-$saldo = $stmt->fetchColumn();
+// Get user saldo (hanya untuk customer)
+$saldo = 0;
+if ($role === 'customer') {
+    $stmt = $db->prepare('SELECT saldo FROM user WHERE id_user = ?');
+    $stmt->execute([$userId]);
+    $saldo = $stmt->fetchColumn();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -246,8 +257,8 @@ tailwind.config = {
         </div>
         <?php endif; ?>
 
-        <!-- ========== MY ORDER STATISTICS (UNTUK CUSTOMER) ========== -->
-        <?php if ($role === 'customer'): ?>
+        <!-- ========== MY ORDER STATISTICS (UNTUK CUSTOMER, WORKER, SUPERVISOR SAJA) ========== -->
+        <?php if ($showMyOrderStats): ?>
         <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4">My Order Statistics</h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div class="stat-card-blue rounded-2xl p-5 text-white shadow-lg transform transition hover:scale-105">
@@ -291,7 +302,7 @@ tailwind.config = {
         <?php endif; ?>
 
         <!-- ========== SYSTEM OVERVIEW (UNTUK ADMIN/SUPERVISOR/WORKER) ========== -->
-        <?php if ($role !== 'customer'): ?>
+        <?php if ($showSystemOverview): ?>
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 mb-6">
             <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                 <span class="material-symbols-outlined text-primary">insights</span>

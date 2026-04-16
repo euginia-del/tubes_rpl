@@ -23,6 +23,21 @@ $stmt = $db->prepare('
 ');
 $stmt->execute();
 $monthlyData = $stmt->fetchAll();
+
+// Get recent orders from ALL customers
+$stmt = $db->query('
+    SELECT o.*, u.nama as customer_name, l.nama_layanan as service_name
+    FROM orders o
+    JOIN user u ON o.id_user = u.id_user
+    JOIN layanan l ON o.id_layanan = l.id_layanan
+    ORDER BY o.tanggal_order DESC
+    LIMIT 10
+');
+$recentOrders = $stmt->fetchAll();
+
+// Get all customers list
+$stmt = $db->query('SELECT id_user, nama, email FROM user WHERE role = "customer" ORDER BY id_user DESC');
+$allCustomers = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -131,10 +146,11 @@ tailwind.config = {
             <canvas id="revenueChart" height="200"></canvas>
         </div>
 
-        <!-- Recent Orders Table -->
-        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden">
-            <div class="px-6 py-4 border-b dark:border-slate-700">
-                <h2 class="text-lg font-bold text-gray-800 dark:text-white">Recent Orders</h2>
+        <!-- Recent Orders Table (SEMUA CUSTOMER) -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden mb-8">
+            <div class="px-6 py-4 border-b dark:border-slate-700 bg-cyan-50 dark:bg-cyan-900/20">
+                <h2 class="text-lg font-bold text-cyan-800 dark:text-cyan-300">Recent Orders (Semua Customer)</h2>
+                <p class="text-sm text-cyan-600">10 order terakhir dari semua customer</p>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -143,35 +159,76 @@ tailwind.config = {
                             <th class="px-4 py-3 text-left">Order ID</th>
                             <th class="px-4 py-3 text-left">Customer</th>
                             <th class="px-4 py-3 text-left">Service</th>
-                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-center">Weight</th>
                             <th class="px-4 py-3 text-right">Total</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-center">Date</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php 
-                        $stmt = $db->query('
-                            SELECT o.*, u.nama as customer_name, l.nama_layanan as service_name
-                            FROM orders o
-                            JOIN user u ON o.id_user = u.id_user
-                            JOIN layanan l ON o.id_layanan = l.id_layanan
-                            ORDER BY o.tanggal_order DESC
-                            LIMIT 10
-                        ');
-                        $recentOrders = $stmt->fetchAll();
-                        ?>
                         <?php foreach($recentOrders as $order): ?>
-                        <tr class="border-b dark:border-slate-700">
-                            <td class="px-4 py-3">#<?= $order['id_order'] ?></td>
-                            <td class="px-4 py-3"><?= htmlspecialchars($order['customer_name']) ?></td>
+                        <tr class="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                            <td class="px-4 py-3 font-medium">#<?= $order['id_order'] ?></td>
+                            <td class="px-4 py-3">
+                                <span class="flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-sm text-gray-400">person</span>
+                                    <?= htmlspecialchars($order['customer_name']) ?>
+                                </span>
+                            </td>
                             <td class="px-4 py-3"><?= htmlspecialchars($order['service_name']) ?></td>
+                            <td class="px-4 py-3 text-center"><?= $order['berat_cucian'] ?> kg</td>
+                            <td class="px-4 py-3 text-right font-semibold">Rp <?= number_format($order['harga_snapshot'],0,',','.') ?></td>
                             <td class="px-4 py-3 text-center">
                                 <span class="badge <?= $order['status_order'] == 'selesai' ? 'badge-success' : ($order['status_order'] == 'proses' ? 'badge-info' : 'badge-warning') ?>">
                                     <?= $order['status_order'] ?>
                                 </span>
                             </td>
-                            <td class="px-4 py-3 text-right font-semibold">Rp <?= number_format($order['harga_snapshot'],0,',','.') ?></td>
+                            <td class="px-4 py-3 text-center text-sm"><?= date('d/m/Y', strtotime($order['tanggal_order'])) ?></td>
                         </tr>
                         <?php endforeach; ?>
+                        <?php if(empty($recentOrders)): ?>
+                        <tr>
+                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">Belum ada order</td>
+                        </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Daftar Semua Customer -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden">
+            <div class="px-6 py-4 border-b dark:border-slate-700">
+                <h2 class="text-lg font-bold text-gray-800 dark:text-white">Daftar Customer</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Semua customer yang terdaftar</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-slate-700">
+                        <tr>
+                            <th class="px-4 py-3 text-left">ID</th>
+                            <th class="px-4 py-3 text-left">Nama Customer</th>
+                            <th class="px-4 py-3 text-left">Email</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($allCustomers as $customer): ?>
+                        <tr class="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                            <td class="px-4 py-3">#<?= $customer['id_user'] ?></td>
+                            <td class="px-4 py-3">
+                                <span class="flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-sm text-gray-400">person</span>
+                                    <?= htmlspecialchars($customer['nama']) ?>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3"><?= htmlspecialchars($customer['email']) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if(empty($allCustomers)): ?>
+                        <tr>
+                            <td colspan="3" class="px-4 py-8 text-center text-gray-500">Belum ada customer terdaftar</td>
+                        </tr>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
