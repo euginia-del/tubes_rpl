@@ -207,21 +207,6 @@ tailwind.config = {
                     <span class="material-symbols-outlined text-6xl text-gray-400">check_circle</span>
                     <p class="text-gray-500 dark:text-gray-400 mt-4">Tidak ada pembayaran yang menunggu verifikasi</p>
                     <p class="text-gray-400 text-sm mt-2">Customer akan upload bukti setelah melakukan pembayaran</p>
-                    
-                    <!-- Panduan untuk testing -->
-                    <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-left">
-                        <p class="font-semibold text-blue-800 dark:text-blue-300 mb-2">📌 Cara Menambahkan Data Pembayaran:</p>
-                        <ol class="text-sm text-blue-700 dark:text-blue-400 list-decimal list-inside space-y-1">
-                            <li>Login sebagai Customer (michel@gmail.com / michel123)</li>
-                            <li>Buat order baru di New Order</li>
-                            <li>Setelah order dibuat, buka detail order</li>
-                            <li>Klik tombol "Bayar Sekarang"</li>
-                            <li>Pilih metode pembayaran (GoPay/DANA/Bank Transfer)</li>
-                            <li>Upload bukti pembayaran (file gambar)</li>
-                            <li>Klik Konfirmasi Pembayaran</li>
-                            <li>Data akan muncul di halaman ini</li>
-                        </ol>
-                    </div>
                 </div>
                 <?php else: ?>
                 <div class="space-y-4">
