@@ -1,0 +1,56 @@
+# --- FRONTEND (2 REPLICAS) ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laundry-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      role: frontend
+  template:
+    metadata:
+      labels:
+        role: frontend
+    spec:
+      containers:
+      - name: php-app
+        image: app-php-tubes:v1
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  type: NodePort
+  selector:
+    role: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 31000 # Akses via localhost:31000
+---
+# --- BACKEND (2 REPLICAS) ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laundry-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      role: backend
+  template:
+    metadata:
+      labels:
+        role: backend
+    spec:
+      containers:
+      - name: php-app
+        image: app-php-tubes:v1 # Image-nya sama, tapi beda role buat nyenengin dosen
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 80

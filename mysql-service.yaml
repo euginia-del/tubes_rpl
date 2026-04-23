@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+spec:
+  selector:
+    app: mysql
+  ports:
+    - protocol: TCP
+      port: 3306        # Port di dalam Kubernetes
+      targetPort: 3306  # Port di dalam Container
+      nodePort: 30006   # Port yang bisa kamu akses dari laptop kamu
+  type: NodePort
